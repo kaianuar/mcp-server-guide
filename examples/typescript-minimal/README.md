@@ -1,0 +1,123 @@
+# Enhanced TypeScript MCP Server Example
+
+This directory contains an enhanced example of a Model Context Protocol (MCP) server written in TypeScript using the `@modelcontextprotocol/sdk`.
+
+This server demonstrates:
+- Basic server setup with name and version.
+- Declaring server capabilities (tools, resources, prompts).
+- Implementing a simple `echo` tool.
+- Implementing a `calculate` tool with input validation (Zod) and error handling.
+- Implementing a static `hello` resource (`mcp-resource://enhanced-typescript-server/hello`).
+- Implementing a dynamic `greeting` resource (`mcp-resource://enhanced-typescript-server/greeting/{name}`).
+- Implementing an asynchronous `fetch-json` tool that retrieves JSON data from a URL.
+- Implementing a `summarize-text` prompt template.
+- Server-side logging using `console.error`.
+- Running the server using the `StdioServerTransport`.
+
+## Capabilities
+
+- **Tools:**
+  - `echo`: Takes a string message and returns it.
+  - `calculate`: Takes two numbers and an operation (+, -, *, /) and returns the result.
+  - `fetch-json`: Takes a URL and returns the fetched JSON data, pretty-printed.
+- **Resources:**
+  - `mcp-resource://enhanced-typescript-server/hello`: A static resource returning a greeting message (`text/plain`).
+  - `mcp-resource://enhanced-typescript-server/greeting/{name}`: A dynamic resource returning a personalized greeting based on the `{name}` provided in the URI (`text/plain`).
+- **Prompts:**
+  - `summarize-text`: A template for generating a prompt to summarize text.
+    - Arguments:
+      - `text_to_summarize` (string): The text to be summarized.
+      - `operation` (string, optional, default: 'add', options: 'add', 'subtract', 'multiply', 'divide')
+    - Returns: `string` (representing the result)
+- **Logging:** Server logs informational messages and errors to `stderr`.
+
+## Setup
+
+1. Ensure you have Node.js and npm installed.
+2. Navigate to this directory (`examples/typescript-minimal`).
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+## Running the Server
+
+1. Compile the TypeScript code:
+   ```bash
+   npm run build
+   ```
+2. Run the compiled JavaScript code:
+   ```bash
+   node dist/server.js
+   ```
+
+The server will start and listen for MCP messages on standard input/output.
+
+## Interacting with the Server
+
+You can use an MCP client (like the MCP Inspector tool or another application integrated with the SDK) to connect to this server via stdio and interact with its capabilities.
+
+## Usage
+
+Once the server is running (using `npm start` or `npm run dev`), you can interact with it using the `mcp-cli`. Ensure you have `mcp-cli` installed (`npm install -g @modelcontextprotocol/cli`).
+
+**Connect to the Server:**
+
+Use the `stdio` transport to connect:
+
+```bash
+mcp connect stdio --command "npm run start"
+# Or if already running separately:
+mcp connect stdio --command "node build/server.js"
+```
+
+Once connected, you can use the following commands in the `mcp-cli` prompt:
+
+**1. List Capabilities:**
+
+```
+> caps
+```
+This will show the available tools, resources, and prompts.
+
+**2. Use the `calculate` tool:**
+
+```
+> tool calculate --operation add --a 5 --b 3
+> tool calculate --operation multiply --a 5 --b 3
+```
+
+**3. Fetch the static `hello` resource:**
+
+```bash
+mcp-cli resource fetch mcp-resource://enhanced-typescript-server/hello
+```
+
+**4. Fetch the dynamic `greeting` resource:**
+
+```bash
+mcp-cli resource fetch mcp-resource://enhanced-typescript-server/greeting/Friend
+mcp-cli resource fetch mcp-resource://enhanced-typescript-server/greeting/TypeScript
+```
+
+**5. Use the `fetch-json` tool:**
+
+```bash
+# Fetch a sample post from JSONPlaceholder
+mcp-cli tool fetch-json --url https://jsonplaceholder.typicode.com/posts/1
+```
+
+**6. Use the `summarize-text` prompt:**
+
+```bash
+mcp-cli prompt summarize-text --text_to_summarize "TypeScript is a free and open-source high-level programming language developed by Microsoft that adds static typing with optional type annotations to JavaScript."
+```
+
+**7. Disconnect:**
+
+```
+> disconnect
+# or Ctrl+C
+```
+
+For detailed information on the Model Context Protocol, refer to the [official specification](https://github.com/modelcontext/specification).

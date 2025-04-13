@@ -1,0 +1,23 @@
+{
+  "name": "typescript-minimal-mcp-server",
+  "version": "1.0.0",
+  "description": "Minimal TypeScript MCP Server Example",
+  "main": "build/server.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/server.js",
+    "dev": "tsc && node build/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.8.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}
