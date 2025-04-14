@@ -279,7 +279,57 @@ Resources expose data to the client. They are identified by URIs.
 
 ### Static Resources
 
-{{ ... }}
+Static resources provide fixed data identified by a specific URI. They don't take parameters from the URI path itself.
+
+*   **Python (`@mcp.resource` decorator):** Define an async function that returns `ResourceContents`.
+
+    ```python
+    # examples/python-minimal/server.py
+    from mcp_sdk import ResourceContents
+    import logging
+
+    # ... (assuming 'mcp' FastMCP instance and 'log' logger are defined)
+
+    @mcp.resource(uri="mcp-resource://enhanced-python-server/hello")
+    async def hello_resource() -> ResourceContents:
+        """A simple static resource handler."""
+        log.info("Static resource '/hello' requested.")
+        return ResourceContents(
+            uri="mcp-resource://enhanced-python-server/hello",
+            content_type="text/plain",
+            content="Hello from the enhanced Python MCP server!"
+        )
+    ```
+
+*   **TypeScript (`@mcp.resource` decorator):** Define an async method that returns `Promise<ResourceContents>`.
+
+    ```typescript
+    // examples/typescript-minimal/src/server.ts
+    import { ResourceContents } from "@modelcontextprotocol/sdk";
+    import { logInfo } from "./utils"; // Assuming a logging utility
+
+    // ... (within the server class definition where 'mcp' is an instance of FastMCP)
+
+    @mcp.resource({
+      uri: "mcp-resource://enhanced-typescript-server/hello",
+      description: "A simple static resource.",
+      // No schema needed for static resources without parameters
+    })
+    async helloResource(
+      uri: string,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      handlerArgs: any // See note below about handlerArgs type
+    ): Promise<ResourceContents> { // Use ResourceContents type here
+      logInfo(`Static resource '${uri}' requested.`);
+      return {
+        uri: uri,
+        content_type: "text/plain",
+        content: "Hello from the enhanced TypeScript MCP server!",
+      };
+    }
+    ```
+
+### Dynamic Resources (Templates)
 
 **TypeScript Handler Signature Note:**
 
@@ -290,10 +340,6 @@ The recommended workaround is to type the second argument as `any` and manually 
 **Note on Resource Handler Return Types (TypeScript):**
 
 Due to potential type mismatches encountered with `@modelcontextprotocol/sdk@1.8.0`, the return type for resource handlers in the example (`hello-resource` and the `greetingHandler` template) has been temporarily set to `Promise<any>`. This bypasses strict TypeScript checking to allow the server to run correctly. This should ideally be revisited if clearer type definitions or examples become available for this SDK version.
-
-```typescript
-// examples/typescript-minimal/src/server.ts
-{{ ... }}
 
 ## Running the Server
 
