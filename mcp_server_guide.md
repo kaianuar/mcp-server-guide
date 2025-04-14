@@ -1,156 +1,207 @@
-# MCP Server Development Guide for AIs
+# Guide to Building Model Context Protocol (MCP) Servers
 
-This guide provides a concise overview of the Model Context Protocol (MCP) Server development process, intended for AI assistants.
+## Introduction
 
-## 1. Introduction: What is an MCP Server?
+The Model Context Protocol (MCP) provides a standardized way for Large Language Model (LLM) applications (clients) to interact with external data sources and functionalities (servers). Think of it as a specialized API layer designed specifically for AI interactions.
 
-An MCP Server is a process that extends the capabilities of an AI/LLM client (like an IDE extension or desktop application). It acts as a bridge, allowing the AI to interact with external data sources, APIs, local filesystems, or execute specific functions.
+**Core Interaction Flow:**
 
-Key Capabilities Provided by Servers:
+```
++-----------------+      +-----------------+      +--------------------+
+| LLM Application | ---- |    MCP Server   | ---- | External Data/Tool |
+|    (Client)     |      | (Your Code Here)|      | (Database, API, etc)|
++-----------------+      +-----------------+      +--------------------+
+     (Requests:             (Implements Tools,
+  Call Tool, Read          Resources, Prompts)
+   Resource, etc)
+                            (Handles Requests,
+                         Interacts with External)
 
-*   **Tools:** Expose functions the AI can call (e.g., run code, query an API, fetch data).
-*   **Resources:** Provide access to file-like data (e.g., file contents, database records, API responses) via URIs.
-*   **Prompts:** Offer pre-defined, reusable prompt templates for specific tasks.
+     (Receives:
+  Tool Output, Resource
+    Content, etc)
+```
 
-## 2. Core Concepts
+This guide explains how to build the **MCP Server** component using the official TypeScript and Python SDKs.
 
-*   **Server Instance:** The main object representing your server. Needs a unique `name` and `version`.
-*   **Capabilities:** The features your server exposes. Declared during initialization. Common capabilities include:
-    *   `tools`: Allows defining callable functions.
-    *   `resources`: Allows providing data via URIs.
-    *   `prompts`: Allows offering prompt templates.
-    *   `logging`: Enables the server to send log messages to the client.
-    *   `sampling`: (Client capability) Allows the *server* to request LLM generation *from the client*.
-*   **Transports:** The communication mechanism between the client and server. Common types:
-    *   `stdio`: Standard Input/Output. Simple, process-based communication.
-    *   `sse` (Server-Sent Events): HTTP-based streaming, suitable for web contexts.
+## Getting Started
 
-## 3. General Steps to Build an MCP Server
+### 1. Install the SDK
 
-1.  **Choose Language/SDK:** Select an appropriate SDK (see Section 6).
-2.  **Setup Environment:** Install the chosen MCP SDK and any other project dependencies.
-3.  **Initialize Server:** Create an instance of the server, providing its `name`, `version`, and explicitly declaring its `capabilities`.
-4.  **Define Capabilities:**
-    *   **Tools:** Define a schema (name, description, input parameters with types/descriptions) and implement the handler function containing the tool's logic.
-    *   **Resources:** Define metadata (URI, name, description, MIME type) and implement the read handler function.
-    *   **Prompts:** Define metadata (name, description, arguments) and implement the handler function to generate prompt messages.
-5.  **Choose & Configure Transport:** Select the communication transport (e.g., `stdio`).
-6.  **Run the Server:** Start the server process, connecting it to the chosen transport.
+First, you need to install the appropriate SDK for your chosen language:
 
-## 4. Capabilities Explained
-
-### Tools
-
-*   **Schema:** Crucial for the AI to understand how to use the tool. Define input parameters clearly using JSON Schema or SDK-specific methods (e.g., type hints in Python, Zod in TypeScript, annotations in Java/C#).
-*   **Handler:** The function that executes when the tool is called. Receives arguments based on the schema. Should return a result (often as structured text or data).
-*   **Example (Conceptual Python):**
-    ```python
-    @mcp.tool()
-    async def get_weather(latitude: float, longitude: float) -> str:
-        """Gets the weather forecast.
-
-        Args:
-            latitude: The latitude.
-            longitude: The longitude.
-        """
-        # ... implementation using an API ...
-        return formatted_forecast
+*   **TypeScript:**
+    ```bash
+    npm install @modelcontextprotocol/sdk zod zod-to-json-schema
+    # or
+    yarn add @modelcontextprotocol/sdk zod zod-to-json-schema
+    ```
+*   **Python:**
+    ```bash
+    pip install mcp-sdk pydantic
     ```
 
-### Defining Tools
+### 2. Basic Server Setup
 
-Tools represent actions the server can perform. They are defined with a name, an optional description, an input schema (often using libraries like Pydantic for Python or Zod for TypeScript for validation), and a handler function.
+Every MCP server starts by instantiating the `Server` class:
 
-- **Name:** A unique identifier for the tool.
-- **Description:** A brief explanation of what the tool does.
-- **Input Schema:** Defines the expected input parameters, their types, and whether they are required or optional. This allows the MCP client (and potentially the LLM interacting with it) to understand how to use the tool correctly.
-- **Handler Function:** The code that executes the tool's logic. It receives the validated input parameters and should return a dictionary containing either a `content` key (with an array of content items, usually text) or an `error` key.
+*   **TypeScript (`server.ts`):**
+    ```typescript
+    import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+    // Required for stdio communication
+    import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
-**Asynchronous Operations:** Tool handlers can be asynchronous functions (using `async def` in Python or `async function` in TypeScript). This is crucial for tools that perform I/O-bound operations, such as making network requests or accessing databases, without blocking the server's main event loop. The `fetch-json` tool added to the minimal examples demonstrates this pattern, using `aiohttp` (Python) and the native `fetch` API (TypeScript) to retrieve data from a URL asynchronously.
-
-```python
-# Example Python Tool Registration (Conceptual)
-from pydantic import BaseModel
-
-### Resources
-
-*   **URI:** The unique identifier for the resource (e.g., `file:///path/to/file`, `db://table/id`). URIs can also act as templates containing parameters (e.g., `mcp-resource://server/item/{id}`).
-*   **Read Handler:** Function called when a client requests to read the resource URI. It should fetch/generate the data and return it, typically with its content type. If the URI contains parameters, the handler function typically receives the extracted values as arguments (as seen in the Python minimal example's `get_greeting_resource`).
-
-### Prompts
-
-*   **Templates:** Define reusable prompt structures with placeholders for arguments.
-*   **Handler:** Takes arguments provided by the client and populates the template to create the final list of prompt messages.
-
-### Sampling (Server-Side)
-
-*   **Purpose:** Allows the *server* to leverage the *client's* LLM for generation tasks within its own logic (e.g., inside a tool handler).
-*   **Check Client Capability:** *Always* check if the connected client supports sampling before attempting.
-*   **Request:** Construct a `CreateMessageRequest` specifying the prompt, model preferences (hints, priorities), system prompt, max tokens, etc.
-*   **Response:** Process the `CreateMessageResult` from the client.
-
-### Logging
-
-*   **Purpose:** Send status updates or debug information from the server to the client.
-*   **Mechanism:** Use the SDK's logging notification function (often via an `exchange` or `session` object passed to handlers).
-*   **Levels:** Supports standard severity levels (DEBUG, INFO, WARNING, ERROR, etc.). Clients can set a minimum level to filter messages.
-
-## 5. Connecting a Client
-
-*   **Configuration:** Clients (like Claude Desktop, VS Code extensions) usually require configuration to know how to launch and communicate with your server.
-*   **Example (`claude_desktop_config.json`):**
-    ```json
-    {
-      "mcpServers": {
-        "enhanced-python-server": { // Must match the name used when initializing the server
-          "command": "/path/to/executable/or/script/runner", // e.g., "python", "node"
-          "args": [
-            "/absolute/path/to/your/server/script.py", // Script/executable to run
-            // ... other arguments needed by your server ...
-          ],
-          "cwd": "/absolute/path/to/working/directory" // Optional working directory
-        }
+    const server = new Server(
+      {
+        // Server metadata
+        name: "my-cool-mcp-server",
+        version: "1.0.0",
+      },
+      {
+        // Declare capabilities (tools, resources, prompts, logging)
+        capabilities: {
+          tools: {},
+          resources: {},
+          // prompts: {},
+          // logging: {},
+        },
       }
+    );
+
+    // ... Define Tools, Resources, Prompts here ...
+
+    // Function to start the server (see "Running the Server" section)
+    async function start() {
+      console.error("Starting server via stdio...");
+      const transport = new StdioServerTransport();
+      await server.connect(transport);
+      console.error("Server connected.");
+    }
+
+    // Only start if not running in a test environment
+    if (process.env.NODE_ENV !== 'test') {
+       start();
     }
     ```
-*   **Key Points:** Use **absolute paths** for commands, arguments, and CWD. Ensure the `command` is executable and in the system's PATH or specified absolutely. The server name key (e.g., `enhanced-python-server`) must match the name used when initializing the server instance.
-*   **See Example READMEs:** For specific `mcp-cli` commands tailored to the minimal examples, refer to the `README.md` file within each example directory (`examples/python-minimal/README.md` and `examples/typescript-minimal/README.md`).
 
-## 6. Available SDKs
+*   **Python (`server.py`):**
+    ```python
+    from mcp_sdk.server import Server
+    # Required for stdio communication
+    from mcp_sdk.server.stdio import StdioServerTransport
+    import asyncio
 
-Official or community SDKs exist for various languages:
+    server = Server(
+        name="my-cool-mcp-server",
+        version="1.0.0",
+        capabilities={
+            "tools": {},
+            "resources": {},
+            # "prompts": {},
+            # "logging": {},
+        }
+    )
 
-*   **Python:** [`mcp-sdk`](https://github.com/modelcontextprotocol/mcp-sdk) (Part of the main SDK repository)
-*   **TypeScript/Node.js:** [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/mcp-sdk) (Part of the main SDK repository)
-*   **Java:** [`java-sdk`](https://github.com/modelcontextprotocol/java-sdk)
-*   **Kotlin:** [`kotlin-sdk`](https://github.com/modelcontextprotocol/kotlin-sdk)
-*   **C#/.NET:** [`csharp-sdk`](https://github.com/modelcontextprotocol/csharp-sdk)
+    # ... Define Tools, Resources, Prompts here ...
 
-Refer to the specific SDK documentation and examples for detailed usage.
+    # Function to start the server (see "Running the Server" section)
+    async def start():
+        print("Starting server via stdio...", file=sys.stderr)
+        transport = StdioServerTransport()
+        await server.connect(transport)
+        print("Server connected.", file=sys.stderr)
+        # Keep running indefinitely (or until transport closes)
+        await asyncio.Event().wait()
 
-## 7. Key Considerations
+    if __name__ == "__main__":
+        import sys
+        # Ensure event loop runs on Windows
+        if sys.platform == "win32":
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        try:
+            asyncio.run(start())
+        except KeyboardInterrupt:
+            print("Server stopped.", file=sys.stderr)
+    ```
 
-*   **Clear Schemas:** Define tool/prompt schemas precisely. This is how the AI understands what your server can do.
-*   **Error Handling:** Implement robust error handling within your server logic and tool handlers.
-*   **Security:** Be mindful of security when exposing tools that interact with filesystems, APIs, or execute commands.
-*   **Transport Choice:** Use `stdio` for simple, local process communication. Use `sse` for web-based integrations.
-*   **Absolute Paths:** Emphasize using absolute paths in client configurations.
-*   **Debugging:** Utilize server-side logging and client-side logs (like Claude Desktop's `mcp*.log` files) for troubleshooting.
+### 3. Schemas for Inputs (Zod / Pydantic)
 
-## 8. Minimal Runnable Examples
+MCP relies on JSON Schema to define the expected structure of inputs for Tools and Prompts. The SDKs integrate well with popular validation libraries:
 
-To help you get started quickly, enhanced minimal runnable server examples are provided:
+*   **[Zod](https://zod.dev/) (TypeScript):** Used to define input objects and automatically generate JSON Schema.
+*   **[Pydantic](https://docs.pydantic.dev/) (Python):** Used to define input models and automatically generate JSON Schema.
 
-*   **Python:** [./examples/python-minimal/](./examples/python-minimal/)
-*   **TypeScript:** [./examples/typescript-minimal/](./examples/typescript-minimal/)
+You'll see these used extensively in the examples to ensure data passed to your handlers is correctly structured and typed.
 
-These examples demonstrate:
-*   Basic server initialization with `stdio` transport and logging.
-*   Definition and implementation of:
-    *   A `calculate` tool (performs arithmetic).
-    *   A `hello` resource (provides static text).
-    *   A `summarize-text` prompt template.
-*   Instructions for setup and running.
-*   Example `mcp-cli` usage commands in their respective `README.md` files.
+## Defining Tools
 
-Use these as a starting point and reference for your own MCP server development.
+Tools represent actions or functions the server can perform when requested by the client.
+
+{{ ... }}
+
+**Error Handling in Tools:**
+
+If a tool encounters an error during execution (e.g., failed network request, invalid calculation), it should **throw an Error** (or a custom subclass of Error).
+
+**Why Throw?** The MCP SDK's server framework includes built-in error handling. When you throw an error from your handler, the SDK catches it and automatically formats it into the standard JSON-RPC error response structure required by the MCP protocol before sending it back to the client. This is simpler and more consistent than manually constructing error objects.
+
+```typescript
+// examples/typescript-minimal/src/server.ts (Illustrative snippet)
+server.tool(
+{{ ... }}
+
+## Defining Resources
+
+Resources expose data to the client. They are identified by URIs.
+
+**Resource URI Schemes:** You can define your own URI schemes (e.g., `database://`, `my-api://`, `system://`). Choose schemes that are descriptive and make sense for your server's context. The client will use these exact URIs to request resources.
+
+### Static Resources
+
+{{ ... }}
+
+**TypeScript Handler Signature Note:**
+
+Currently, the TypeScript SDK's type definitions (`ReadResourceTemplateCallback`) do not seem to automatically infer the types of parameters defined in the `ResourceTemplate` (e.g., `{name}`) into the second argument (`variables`). This means a signature like `async (uri, { name }) => { ... }` will likely cause a TypeScript error.
+
+The recommended workaround is to type the second argument as `any` and manually extract/validate the parameters within the handler function. **Be cautious when accessing properties on `handlerArgs: any`**, as they lack compile-time checks. Consider adding runtime checks or type guards if necessary for robustness.
+
+```typescript
+// examples/typescript-minimal/src/server.ts
+{{ ... }}
+
+## Running the Server
+
+MCP servers typically communicate with clients over standard input/output (stdio) using a JSON-RPC protocol. The SDKs provide `StdioServerTransport` to handle this.
+
+To run your server, execute your main script (`server.ts` compiled to `.js`, or `server.py`) from the command line:
+
+*   **TypeScript (after compiling):**
+    ```bash
+    # Assuming server.ts is compiled to dist/server.js
+    node dist/server.js --stdio
+    ```
+    *(Note: The `--stdio` flag isn't strictly required by the SDK transport itself, but often used by clients like Cursor to identify how to connect.)*
+
+*   **Python:**
+    ```bash
+    python server.py --stdio
+    ```
+
+**Important:** When using stdio transport:
+*   **Server logs (debugging, info, errors) MUST be written to `stderr`.**
+*   **`stdout` is strictly reserved for the JSON-RPC messages** exchanged with the client. Using `console.log` (TS) or `print` without `file=sys.stderr` (Python) for general logging will break the communication.
+
+## Client Interaction (Briefly)
+
+Clients interact with the server using an MCP client library. They typically:
+1.  Connect to the running server (often via stdio).
+2.  Discover available tools, resources, and prompts.
+3.  Make requests (e.g., `callTool`, `readResource`).
+4.  Receive responses (tool output, resource content, errors).
+
+Details of client implementation are outside the scope of this server guide.
+
+## Next Steps
+
+Explore the `examples/` directory for runnable Python and TypeScript servers demonstrating these concepts.

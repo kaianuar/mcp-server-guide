@@ -182,20 +182,11 @@ server.tool(
         }],
       };
     } catch (error: any) {
-      // Handle potential AbortSignal timeout
-      if (error.name === 'TimeoutError') {
-         console.error(`Request timed out fetching URL ${url}`);
-         return {
-            content: [], // Add empty content array for error case
-            error: { message: "Request timed out." }
-         };
-      }
-      // Handle potential fetch errors (network issues, etc.)
-      console.error(`Error fetching URL ${url}: ${error.message}`);
-       return {
-         content: [], // Add empty content array for error case
-         error: { message: `Failed to fetch URL: ${error.message}` }
-       };
+      console.error(`[ERROR] fetch-json failed for URL ${url}:`, error); // Server log
+      // Throw an error, which the SDK should catch and format into a JSON-RPC error response.
+      // This pattern (throwing from handlers) was observed in community examples
+      // (e.g., Falkicon/mcp-server-template) and seems preferred over returning an error object.
+      throw new Error(`Failed to fetch or parse JSON from ${url}: ${error.message}`);
     }
   }
 );
@@ -225,33 +216,39 @@ server.resource(
 // --- Dynamic Greeting Resource --- //
 const GREETING_RESOURCE_URI_TEMPLATE = "mcp-resource://enhanced-typescript-server/greeting/{name}";
 
-// Define the handler explicitly with the expected callback type
+// Define the handler using 'handlerArgs: any' as a workaround.
+// The SDK's type definitions for the ReadResourceTemplateCallback do not seem
+// to correctly infer or type the parameters defined in the ResourceTemplate
+// (like '{name}' here) into the second argument ('variables: Variables').
+// Attempting to use the signature 'async (uri, { name }: { name: string }) => { ... }'
+// results in a TypeScript error (No overload matches...).
+// Using 'any' bypasses this type check, but requires manual extraction and type checking.
+// TODO: Revisit if SDK types are updated or clearer examples become available.
 const greetingHandler = async (uri: URL, handlerArgs: any) => {
   console.error(`[INFO] Dynamic resource requested: ${uri.href}`); // Server log
 
-  // Access name from the handlerArgs object (assuming it's passed within)
-  let name: string;
-  const nameVar = handlerArgs.name; // Access name property
-  if (Array.isArray(nameVar)) {
-    name = nameVar[0] ?? "DefaultName"; // Take first element if array
-  } else {
-    name = nameVar ?? "DefaultName"; // Use directly if string, or default
-  }
+  // Manually extract 'name' from the handlerArgs object and provide a default.
+  // The exact structure of handlerArgs might vary, requiring inspection or safer access.
+  const name = handlerArgs?.name ?? "DefaultName";
+  console.error(`[INFO] Name parameter from handlerArgs: ${name}`);
 
   const textContent = `Hello, ${name}! This is a dynamic greeting from the TypeScript server.`;
   return {
-    contents: [{
-      uri: uri.href,
-      content_type: "text/plain",
-      text: textContent, // Use 'text' property
-    }]
+    contents: [
+      {
+        uri: uri.href,
+        content_type: "text/plain",
+        text: textContent,
+      },
+    ],
   };
 };
 
+// Register the dynamic resource using the template
 server.resource(
-  "greeting", // Simple name for the resource registration
-  new ResourceTemplate(GREETING_RESOURCE_URI_TEMPLATE, { list: undefined }), // Template object
-  greetingHandler // Pass the handler using 'any'
+  "greeting-resource",
+  new ResourceTemplate(GREETING_RESOURCE_URI_TEMPLATE, { list: undefined }),
+  greetingHandler // Use the handler defined above
 );
 
 // --- Prompts --- //

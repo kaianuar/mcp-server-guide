@@ -20,9 +20,11 @@ This server demonstrates:
   - `echo`: Takes a string message and returns it.
   - `calculate`: Takes two numbers and an operation (+, -, *, /) and returns the result.
   - `fetch-json`: Takes a URL and returns the fetched JSON data, pretty-printed.
+    *   **Error Handling:** Note that the `fetch-json` handler uses a `try...catch` block and `throw new Error(...)` to signal errors. The MCP SDK catches these errors and formats the response.
 - **Resources:**
   - `mcp-resource://enhanced-typescript-server/hello`: A static resource returning a greeting message (`text/plain`).
   - `mcp-resource://enhanced-typescript-server/greeting/{name}`: A dynamic resource returning a personalized greeting based on the `{name}` provided in the URI (`text/plain`).
+    *   **Handler Signature:** Due to current limitations in the MCP TypeScript SDK's type inference for `ResourceTemplate` callbacks, the handler for this resource in `src/server.ts` uses `handlerArgs: any` for the second argument. The `name` parameter is then manually extracted from `handlerArgs`. See the comments in `src/server.ts` for more details.
 - **Prompts:**
   - `summarize-text`: A template for generating a prompt to summarize text.
     - Arguments:
