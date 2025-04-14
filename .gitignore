@@ -8,6 +8,25 @@ __pycache__/
 
 # Node modules
 node_modules/
+dist/
+build/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+
+# Sandbox directories (for file I/O examples)
+examples/*/sandbox/
 
 # OS generated files
 .DS_Store
