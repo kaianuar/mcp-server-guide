@@ -25,6 +25,7 @@ This server demonstrates:
   - `mcp-resource://enhanced-typescript-server/hello`: A static resource returning a greeting message (`text/plain`).
   - `mcp-resource://enhanced-typescript-server/greeting/{name}`: A dynamic resource returning a personalized greeting based on the `{name}` provided in the URI (`text/plain`).
     *   **Handler Signature:** Due to current limitations in the MCP TypeScript SDK's type inference for `ResourceTemplate` callbacks, the handler for this resource in `src/server.ts` uses `handlerArgs: any` for the second argument. The `name` parameter is then manually extracted from `handlerArgs`. See the comments in `src/server.ts` for more details.
+    *   **Note on Resource Handler Types:** Due to type mismatches encountered with the `@modelcontextprotocol/sdk@1.8.0` version, the return type for resource handlers (`hello-resource` and the `greetingHandler` template) has been temporarily set to `Promise<any>`. This bypasses strict TypeScript checking to allow the server to run correctly. Ideally, this should be revisited if clearer type definitions or examples become available for this SDK version.
 - **Prompts:**
   - `summarize-text`: A template for generating a prompt to summarize text.
     - Arguments:

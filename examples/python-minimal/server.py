@@ -1,16 +1,17 @@
 import logging
-from mcp.server.fastmcp import FastMCP
-from mcp.model.resource import ResourceMetadata, ResourceContent
-from mcp.model.prompt import PromptArgument, PromptMetadata, Prompt
-from mcp.model.message import Message
-from typing import TypedDict, List
+from mcp.server import FastMCP
+from mcp.types import ResourceContents, Resource, TextContent, TextResourceContents
+from mcp.types import PromptArgument, Prompt
+from mcp.types import SamplingMessage
+from typing import TypedDict, List, Dict, Any, Optional
 import asyncio
 import aiohttp
 import json
 from pydantic import BaseModel, Field, HttpUrl
+import sys
 
 # Configure basic logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', stream=sys.stderr)
 log = logging.getLogger(__name__)
 
 # 1. Initialize FastMCP server
@@ -19,6 +20,8 @@ mcp = FastMCP(
     "enhanced-python-server",
     capabilities=["tools", "resources", "prompts", "logging"]
 )
+
+log.info(f"MCP Server '{mcp.name}' initialized.")
 
 # --- Tools --- #
 
@@ -32,25 +35,30 @@ def calculate(a: float, b: float, operation: str = 'add') -> str:
         b: The second number.
         operation: The operation to perform ('add', 'subtract', 'multiply', 'divide'). Defaults to 'add'.
     """
-    log.info(f"Calculate tool called: {a} {operation} {b}")
+    log.info(f"Tool 'calculate' called with a={a}, b={b}, operation='{operation}'")
     result: float
     if operation == 'add':
+        log.debug(f"Performing addition: {a} + {b}")
         result = a + b
     elif operation == 'subtract':
+        log.debug(f"Performing subtraction: {a} - {b}")
         result = a - b
     elif operation == 'multiply':
+        log.debug(f"Performing multiplication: {a} * {b}")
         result = a * b
     elif operation == 'divide':
+        log.debug(f"Performing division: {a} / {b}")
         if b == 0:
-            log.error("Division by zero attempted")
-            raise ValueError("Division by zero is not allowed.")
+            log.warning("Attempted division by zero.")
+            raise ValueError("Cannot divide by zero")
         result = a / b
     else:
-        log.warning(f"Unsupported operation: {operation}")
-        raise ValueError(f"Unsupported operation: {operation}. Use 'add', 'subtract', 'multiply', or 'divide'.")
+        log.warning(f"Invalid operation '{operation}' requested.")
+        raise ValueError(f"Invalid operation: {operation}")
 
-    # Return the result as a string, matching the TypeScript example
-    return str(result)
+    response_str = str(result)
+    log.info(f"Tool 'calculate' completed. Result: {response_str}")
+    return response_str
 
 # --- Tool: Fetch JSON ---
 class FetchJsonParams(BaseModel):
@@ -59,7 +67,6 @@ class FetchJsonParams(BaseModel):
 @mcp.tool(
     name="fetch-json",
     description="Fetches JSON data from a given URL.",
-    input_schema=FetchJsonParams,
 )
 async def fetch_json(params: FetchJsonParams) -> str:
     """
@@ -129,24 +136,20 @@ async def fetch_json(params: FetchJsonParams) -> str:
 HELLO_RESOURCE_URI = "mcp-resource://enhanced-python-server/hello"
 
 @mcp.resource(HELLO_RESOURCE_URI)
-def get_hello_resource() -> ResourceContent:
+def get_hello_resource() -> ResourceContents:
     """Provides a simple 'Hello' resource."""
-    log.info(f"Resource requested: {HELLO_RESOURCE_URI}")
-    return ResourceContent(
+    log.info(f"Resource '{HELLO_RESOURCE_URI}' requested.")
+    content = ResourceContents(
         uri=HELLO_RESOURCE_URI,
         content_type="text/plain",
         content="Hello from the Enhanced Python MCP Server!" # Updated message
     )
+    log.info(f"Resource '{HELLO_RESOURCE_URI}' completed. Content type: {content.content_type}")
+    return content
 
-# Resource Metadata (optional but recommended for client discovery)
-mcp.add_resource_metadata(
-    ResourceMetadata(
-        uri=HELLO_RESOURCE_URI,
-        name="Hello Resource",
-        description="A simple static text resource.",
-        content_type="text/plain"
-    )
-)
+# Resource registration (the @mcp.resource decorator above already registers the resource)
+# No need for separate metadata registration in this version of the SDK
+# The FastMCP class handles resource registration through the decorator
 
 # --- Dynamic Resource --- #
 
@@ -154,27 +157,22 @@ mcp.add_resource_metadata(
 GREETING_RESOURCE_URI_TEMPLATE = "mcp-resource://enhanced-python-server/greeting/{name}"
 
 @mcp.resource(GREETING_RESOURCE_URI_TEMPLATE)
-def get_greeting_resource(name: str) -> ResourceContent:
+def get_greeting_resource(name: str) -> ResourceContents:
     """Provides a personalized greeting resource based on the name in the URI."""
-    log.info(f"Dynamic resource requested: {GREETING_RESOURCE_URI_TEMPLATE} with name='{name}'")
+    log.info(f"Resource '{GREETING_RESOURCE_URI_TEMPLATE}' requested for name='{name}'")
     uri = GREETING_RESOURCE_URI_TEMPLATE.format(name=name)
-    return ResourceContent(
+    text_content = f"Hello, {name}! This is a dynamic greeting from the Python server."
+    content = ResourceContents(
         uri=uri,
         content_type="text/plain",
-        content=f"Hello, {name}! This is a dynamic greeting from the Python server."
+        content=text_content
     )
+    log.info(f"Resource '{uri}' completed. Content: '{text_content[:50]}...' (truncated)")
+    return content
 
-# Dynamic Resource Metadata (optional but recommended for client discovery)
-mcp.add_resource_metadata(
-    ResourceMetadata(
-        uri=GREETING_RESOURCE_URI_TEMPLATE,
-        name="Personalized Greeting Resource",
-        description="A dynamic text resource providing a personalized greeting.",
-        content_type="text/plain",
-        # Indicate path parameters if your SDK supports it explicitly in metadata
-        # (mcp.py uses the URI template string directly for matching)
-    )
-)
+# Dynamic Resource registration (the @mcp.resource decorator above already registers the resource)
+# No need for separate metadata registration in this version of the SDK
+# The FastMCP class handles resource registration through the decorator
 
 # --- Prompts --- #
 
@@ -188,20 +186,26 @@ def get_summary_prompt(text_to_summarize: str) -> Prompt:
     user_message = Message(role="user", content=f"Please summarize the following text:\n\n{text_to_summarize}")
     return Prompt(messages=[user_message])
 
-# Prompt Metadata (optional but recommended for client discovery)
-mcp.add_prompt_metadata(
-    PromptMetadata(
-        name=SUMMARY_PROMPT_NAME,
-        description="A prompt template to summarize text.",
-        arguments=[
-            PromptArgument(name="text_to_summarize", description="The text content to be summarized.", type="string", required=True)
-        ]
-    )
-)
+# Prompt registration (the @mcp.prompt decorator above already registers the prompt)
+# No need for separate metadata registration in this version of the SDK
+# The FastMCP class handles prompt registration through the decorator
 
 # --- Run Server --- #
 
 # Run the server using stdio transport
 if __name__ == "__main__":
-    log.info("Starting enhanced Python MCP server on stdio...")
-    mcp.run(transport='stdio')
+    log.info("Preparing to run MCP server...")
+    # Ensure event loop runs on Windows
+    if sys.platform == "win32":
+        log.debug("Applying WindowsSelectorEventLoopPolicy for asyncio.")
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    try:
+        log.info(f"Starting MCP server '{mcp.name}' via mcp.run()...")
+        mcp.run() # This handles stdio transport and blocks until client disconnects or error
+        log.info(f"MCP server '{mcp.name}' finished running.")
+    except KeyboardInterrupt:
+        log.info("Server stopped by user (KeyboardInterrupt).")
+    except Exception as e:
+        log.exception("MCP server encountered an unexpected error during run.")
+    finally:
+        log.info("Server process exiting.")

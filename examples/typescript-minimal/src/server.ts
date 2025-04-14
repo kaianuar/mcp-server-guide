@@ -1,13 +1,21 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { TextContent, Prompt, ResourceContents, PromptArgument } from "@modelcontextprotocol/sdk/types.js";
+import { ResourceContents, TextContent, Prompt, PromptArgument } from "@modelcontextprotocol/sdk/types.js";
+
+// --- Logger Helper ---
+// Helper to ensure logs go to stderr for stdio transport
+const logInfo = (...args: any[]) => console.error(`[INFO] ${new Date().toISOString()}`, ...args);
+const logWarn = (...args: any[]) => console.error(`[WARN] ${new Date().toISOString()}`, ...args);
+const logError = (...args: any[]) => console.error(`[ERROR] ${new Date().toISOString()}`, ...args);
+const logDebug = (...args: any[]) => console.error(`[DEBUG] ${new Date().toISOString()}`, ...args); // Using console.error for visibility
 
 // --- Server Setup --- //
 
 // 1. Create server instance
 // 'enhanced-typescript-server' is the name clients will use.
-const server = new McpServer({
+logInfo('Initializing MCP server...');
+const serverOptions = {
   name: "enhanced-typescript-server",
   version: "1.0.0",
   capabilities: {
@@ -44,7 +52,8 @@ const server = new McpServer({
       // Note: Schema for path parameters handled by template matching in handler
     }
   ]
-});
+};
+const server = new McpServer(serverOptions);
 
 // --- Tools --- //
 
@@ -59,10 +68,9 @@ server.tool(
   // Handler function for the tool
   async (params: { message: string }) => {
     const inputMessage = params.message;
-    console.error(`[INFO] Echo tool called with message: ${inputMessage}`); // Server log
-
+    logInfo(`Tool 'echo' called with message: "${inputMessage}"`);
     // Return the result structured according to MCP schema
-    return {
+    const result = {
       content: [
         {
           type: "text",
@@ -70,6 +78,8 @@ server.tool(
         } satisfies TextContent,
       ],
     };
+    logInfo(`Tool 'echo' completed. Result: ${JSON.stringify(result)}`);
+    return result;
   }
 );
 
@@ -95,23 +105,29 @@ server.tool(
   calculateSchema.shape,
   async (params): Promise<{ content: TextContent[] }> => {
     const { operand1, operand2, operation } = params;
-    console.error(`[INFO] Calculate tool called: ${operand1} ${operation} ${operand2}`); // Server log
+    logInfo(`Tool 'calculate' called: ${operand1} ${operation} ${operand2}`);
 
     let result: number;
     try {
       if (operation === '+') {
+        logDebug(`Performing addition: ${operand1} + ${operand2}`);
         result = operand1 + operand2;
       } else if (operation === '-') {
+        logDebug(`Performing subtraction: ${operand1} - ${operand2}`);
         result = operand1 - operand2;
       } else if (operation === '*') {
+        logDebug(`Performing multiplication: ${operand1} * ${operand2}`);
         result = operand1 * operand2;
       } else if (operation === '/') {
+        logDebug(`Performing division: ${operand1} / ${operand2}`);
         if (operand2 === 0) {
+          logWarn('Attempted division by zero.');
           throw new Error("Division by zero is not allowed.");
         }
         result = operand1 / operand2;
       } else {
         // Should be caught by Zod enum, but belt-and-suspenders
+        logWarn(`Invalid operation: ${operation}`);
         throw new Error(`Unsupported operation: ${operation}`);
       }
 
@@ -123,18 +139,18 @@ server.tool(
         result
       };
 
+      logInfo(`Tool 'calculate' completed. Result: ${JSON.stringify(output)}`);
       return {
         content: [
           {
             type: "text",
-            // Often useful to return JSON string for structured data
             text: JSON.stringify(output, null, 2)
           } satisfies TextContent
         ]
       };
     } catch (error) {
         // Log error to server console
-        console.error(`[ERROR] Calculation failed: ${error instanceof Error ? error.message : String(error)}`, error);
+        logError(`Calculation failed: ${error instanceof Error ? error.message : String(error)}`);
         // Re-throw to have MCP send an error response to the client
         throw error;
     }
@@ -151,14 +167,14 @@ server.tool(
   "Fetches JSON data from a provided URL.",
   fetchJsonParamsSchema.shape,
   async ({ url }) => {
-    console.error(`[INFO] Tool 'fetch-json' called with URL: ${url}`);
+    logInfo(`Tool 'fetch-json' called with URL: ${url}`);
     try {
       const response = await fetch(url, {
         signal: AbortSignal.timeout(10000) // 10-second timeout
       });
 
       if (!response.ok) {
-        console.error(`HTTP error fetching URL ${url}: Status ${response.status}`);
+        logWarn(`HTTP error fetching URL ${url}: Status ${response.status}`);
         return {
           content: [], // Add empty content array for error case
           error: { message: `HTTP error: ${response.status} ${response.statusText}` },
@@ -167,7 +183,7 @@ server.tool(
 
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
-         console.error(`Invalid content type received from URL: ${url}, expected JSON.`);
+         logWarn(`Invalid content type received from URL: ${url}, expected JSON.`);
          return {
             content: [], // Add empty content array for error case
             error: { message: "Response content type is not JSON." }
@@ -175,6 +191,7 @@ server.tool(
       }
 
       const jsonData = await response.json();
+      logInfo(`Tool 'fetch-json' completed successfully for URL: ${url}. Response size: ${JSON.stringify(jsonData, null, 2).length} chars.`);
       return {
         content: [{
           type: "text",
@@ -182,7 +199,7 @@ server.tool(
         }],
       };
     } catch (error: any) {
-      console.error(`[ERROR] fetch-json failed for URL ${url}:`, error); // Server log
+      logError(`fetch-json failed for URL ${url}: ${error.message}`); // Server log
       // Throw an error, which the SDK should catch and format into a JSON-RPC error response.
       // This pattern (throwing from handlers) was observed in community examples
       // (e.g., Falkicon/mcp-server-template) and seems preferred over returning an error object.
@@ -199,17 +216,17 @@ const HELLO_RESOURCE_URI = "mcp-resource://enhanced-typescript-server/hello";
 server.resource(
   "hello-resource",
   HELLO_RESOURCE_URI,
-  async (uri: URL) => {
-    console.error(`[INFO] Resource requested: ${uri.href}`); // Server log
-    return {
-      contents: [
-        {
-          uri: uri.href,
-          content_type: "text/plain",
-          text: "Hello from the enhanced TypeScript MCP server!"
-        }
-      ]
-    };
+  async (uri: URL): Promise<any> => { 
+    logInfo(`Resource requested: ${uri.href}`);
+    const resourceContent = { 
+        uri: uri.toString(), 
+        content_type: "text/plain",
+        content: [
+            { type: "text", text: "Hello from the enhanced TypeScript MCP server!" } satisfies TextContent
+        ]
+    }; 
+    logInfo(`Resource '${HELLO_RESOURCE_URI}' completed. Content type: text/plain`);
+    return resourceContent; 
   }
 );
 
@@ -224,24 +241,24 @@ const GREETING_RESOURCE_URI_TEMPLATE = "mcp-resource://enhanced-typescript-serve
 // results in a TypeScript error (No overload matches...).
 // Using 'any' bypasses this type check, but requires manual extraction and type checking.
 // TODO: Revisit if SDK types are updated or clearer examples become available.
-const greetingHandler = async (uri: URL, handlerArgs: any) => {
-  console.error(`[INFO] Dynamic resource requested: ${uri.href}`); // Server log
+const greetingHandler = async (uri: URL, handlerArgs: any): Promise<any> => { 
+  logInfo(`Dynamic resource requested: ${uri.href}`);
 
   // Manually extract 'name' from the handlerArgs object and provide a default.
   // The exact structure of handlerArgs might vary, requiring inspection or safer access.
   const name = handlerArgs?.name ?? "DefaultName";
-  console.error(`[INFO] Name parameter from handlerArgs: ${name}`);
+  logInfo(`Name parameter from handlerArgs: ${name}`);
 
-  const textContent = `Hello, ${name}! This is a dynamic greeting from the TypeScript server.`;
-  return {
-    contents: [
-      {
-        uri: uri.href,
-        content_type: "text/plain",
-        text: textContent,
-      },
-    ],
+  const textString = `Hello, ${name}! This is a dynamic greeting from the TypeScript server.`;
+  const resourceContent = { 
+    uri: uri.toString(),
+    content_type: "text/plain",
+    content: [
+        { type: "text", text: textString } satisfies TextContent
+    ]
   };
+  logInfo(`Resource '${uri.href}' completed. Content: '${textString.substring(0, 50)}...' (truncated)`);
+  return resourceContent; 
 };
 
 // Register the dynamic resource using the template
@@ -263,7 +280,7 @@ server.prompt(
     text_to_summarize: z.string().describe("The text content to be summarized.")
   }).shape,
   async (args: { text_to_summarize: string }) => {
-    console.error(`[INFO] Prompt requested: ${SUMMARY_PROMPT_NAME}`); // Server log
+    logInfo(`Prompt requested: ${SUMMARY_PROMPT_NAME} with text length: ${args.text_to_summarize.length}`);
     // Define message structure inline, using TextContent for content field and literal type for role
     const userMessage: { role: "user" | "assistant"; content: TextContent } = {
       role: "user",
@@ -284,12 +301,31 @@ server.prompt(
 
 // 5. Run the server using stdio transport
 async function main() {
+  logInfo(`Starting MCP server '${serverOptions.name}' version ${serverOptions.version}...`);
   const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("Enhanced TypeScript MCP Server running on stdio...");
+  try {
+    await server.connect(transport);
+    logInfo("Server connected via stdio. Waiting for requests...");
+    // Keep the server running (transport handling keeps it alive)
+  } catch (error) {
+    logError("Failed to connect server transport:", error);
+    process.exit(1);
+  }
 }
 
 main().catch((error) => {
-  console.error("Fatal error:", error);
+  logError("Fatal error during server execution:", error);
   process.exit(1);
+});
+
+// Basic handling for graceful shutdown
+process.on('SIGINT', () => {
+  logInfo('Received SIGINT. Shutting down...');
+  // Perform any cleanup here if needed
+  process.exit(0);
+});
+process.on('SIGTERM', () => {
+  logInfo('Received SIGTERM. Shutting down...');
+  // Perform any cleanup here if needed
+  process.exit(0);
 });

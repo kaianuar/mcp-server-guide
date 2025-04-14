@@ -44,92 +44,94 @@ First, you need to install the appropriate SDK for your chosen language:
     yarn add @modelcontextprotocol/sdk zod zod-to-json-schema
     ```
 *   **Python:**
+    It's strongly recommended to use a virtual environment (`venv`).
     ```bash
-    pip install mcp-sdk pydantic
+    # In your project directory (e.g., examples/python-minimal)
+    python3 -m venv venv      # Create venv
+    source venv/bin/activate  # Activate (Linux/macOS)
+    # .\venv\Scripts\activate  # Activate (Windows)
+
+    # Install dependencies from requirements.txt
+    pip install -r examples/python-minimal/requirements.txt
     ```
+    The `requirements.txt` file should typically include `mcp-sdk`, `pydantic`, and any other necessary libraries like `aiohttp`.
 
 ### 2. Basic Server Setup
 
-Every MCP server starts by instantiating the `Server` class:
+The SDKs provide `FastMCP`, a high-level, decorator-based class (inspired by frameworks like FastAPI) for easily defining server capabilities. It's the recommended starting point for both languages.
 
 *   **TypeScript (`server.ts`):**
     ```typescript
-    import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-    // Required for stdio communication
+    import { FastMCP } from "@modelcontextprotocol/sdk/server/fast_mcp/index.js";
     import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+    import { z } from "zod"; // Often needed for schemas
 
-    const server = new Server(
-      {
-        // Server metadata
-        name: "my-cool-mcp-server",
-        version: "1.0.0",
-      },
-      {
-        // Declare capabilities (tools, resources, prompts, logging)
-        capabilities: {
-          tools: {},
-          resources: {},
-          // prompts: {},
-          // logging: {},
-        },
-      }
+    const mcp = new FastMCP(
+      "my-cool-ts-mcp-server", // Server name
+      // "1.0.0" // Optional version
+      // No explicit capabilities dict needed with FastMCP decorators
     );
 
-    // ... Define Tools, Resources, Prompts here ...
+    console.error(`MCP Server '${mcp.name}' initialized.`); // Use mcp.name
 
-    // Function to start the server (see "Running the Server" section)
-    async function start() {
+    // ... Define Tools, Resources, Prompts using @mcp decorators here ...
+
+    async function main() {
       console.error("Starting server via stdio...");
       const transport = new StdioServerTransport();
-      await server.connect(transport);
+      // FastMCP handles the connection internally via run()
+      await mcp.run(transport);
       console.error("Server connected.");
     }
 
     // Only start if not running in a test environment
     if (process.env.NODE_ENV !== 'test') {
-       start();
+      main().catch(err => {
+        console.error("Server failed to start:", err);
+        process.exit(1);
+      });
     }
     ```
 
 *   **Python (`server.py`):**
-    The Python SDK provides `FastMCP`, a high-level, decorator-based class (inspired by frameworks like FastAPI) for easily defining server capabilities. It's the recommended starting point.
     ```python
-    from mcp_sdk import FastMCP # Use FastMCP for the high-level interface
-    # StdioServerTransport might be needed depending on how you run it
-    # from mcp_sdk.server.stdio import StdioServerTransport
     import asyncio
+    import logging
     import sys
-    import logging # Added for clarity
+    from pydantic import BaseModel # Often needed for schemas
+    from mcp_sdk import FastMCP # Use FastMCP for the high-level interface
 
-    log = logging.getLogger(__name__) # Basic logger setup
+    # Configure logging (adjust level and format as needed)
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    log = logging.getLogger(__name__)
+
+    # Instantiate the server
     mcp = FastMCP(
-        "my-cool-mcp-server", # Server name
-        # version="1.0.0", # Optional version
-        # No explicit capabilities dict needed with FastMCP decorators
+      "my-cool-py-mcp-server", # Server name (use mcp.name to access)
+      # version="1.0.0", # Optional version
+      # No explicit capabilities dict needed with FastMCP decorators
     )
+
+    log.info(f"MCP Server '{mcp.name}' initialized.") # Use mcp.name
 
     # ... Define Tools, Resources, Prompts using @mcp decorators here ...
 
-    # Example runner (adapt as needed, see "Running the Server")
-    async def start():
-        print("Starting server via stdio...", file=sys.stderr)
-        # Transport setup might differ based on how client connects
-        # transport = StdioServerTransport()
-        # await mcp.run_async(transport=transport) # run_async is common with FastMCP
-        print("Server connected/running (or use mcp.run()).", file=sys.stderr)
-        # For simple cases, mcp.run() might block and handle transport
-        # await asyncio.Event().wait() # May not be needed if mcp.run() blocks
-
     if __name__ == "__main__":
-        # Ensure event loop runs on Windows
-        if sys.platform == "win32":
-            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        # Ensure correct asyncio policy on Windows if needed
+        if sys.platform == "win32" and sys.version_info >= (3, 8):
+             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+        log.info("Preparing to run MCP server...")
+        log.info(f"Starting MCP server '{mcp.name}' via mcp.run()...")
         try:
-            # Decide how to run: asyncio.run(start()) or mcp.run() directly
-            # asyncio.run(start())
-            mcp.run() # Often simpler for stdio
+            mcp.run() # Handles stdio transport and blocks until client disconnects
+            log.info(f"MCP server '{mcp.name}' finished running.")
         except KeyboardInterrupt:
-            print("Server stopped.", file=sys.stderr)
+            log.info("Server stopped by user (KeyboardInterrupt).")
+        except Exception as e:
+            log.error(f"MCP server encountered an unexpected error during run.", exc_info=True)
+        finally:
+             log.info("Server process exiting.")
     ```
 
 ### 3. Schemas for Inputs (Zod / Pydantic)
@@ -151,10 +153,67 @@ If a tool encounters an error during execution (e.g., failed network request, in
 
 **Why Throw?** The MCP SDK's server framework includes built-in error handling. When you throw an error from your handler, the SDK catches it and automatically formats it into the standard JSON-RPC error response structure required by the MCP protocol before sending it back to the client. This is simpler and more consistent than manually constructing error objects.
 
-```typescript
-// examples/typescript-minimal/src/server.ts (Illustrative snippet)
-server.tool(
-{{ ... }}
+*   **TypeScript (`FastMCP` Decorator):**
+    Use the `@mcp.tool()` decorator. The schema is derived from Zod objects.
+    ```typescript
+    import { z } from "zod";
+
+    // Define input schema using Zod
+    const EchoParamsSchema = z.object({
+      message: z.string(),
+    });
+
+    @mcp.tool({
+      name: "echo", // Optional: defaults to method name
+      description: "Simply returns the message provided.",
+      inputSchema: EchoParamsSchema,
+      // outputSchema: z.string() // Optional: if output needs validation
+    })
+    async echo(params: z.infer<typeof EchoParamsSchema>): Promise<string> {
+      console.error(`Executing echo with message: '${params.message}'`);
+      if (!params.message) {
+          // Example: Throwing an error for invalid input
+          throw new Error("Message cannot be empty");
+      }
+      return params.message;
+    }
+    ```
+
+*   **Python (`FastMCP` Decorator):**
+    Use the `@mcp.tool()` decorator. The schema is inferred from Pydantic type hints.
+    ```python
+    from pydantic import BaseModel
+
+    # Define input schema using Pydantic
+    class EchoParams(BaseModel):
+        message: str
+
+    @mcp.tool() # name defaults to function name 'echo'
+    async def echo(params: EchoParams) -> str:
+        """Simply returns the message provided."""
+        log.info(f"Executing echo with message: '{params.message}'")
+        if not params.message:
+            # Example: Throwing an error for invalid input
+            raise ValueError("Message cannot be empty")
+        return params.message
+
+    # Example for a tool with specific name/description
+    class FetchJsonParams(BaseModel):
+        url: str
+
+    @mcp.tool(
+        name="fetch-json",
+        description="Fetches JSON data from a given URL."
+        # No 'input_schema' argument needed, inferred from 'params: FetchJsonParams'
+    )
+    async def fetch_json(params: FetchJsonParams) -> str:
+         """Fetches JSON data asynchronously."""
+         # ... implementation using aiohttp ...
+         log.info(f"Executing fetch_json for URL: {params.url}")
+         # ... rest of async implementation ...
+         return json_string # Return JSON as a string
+    ```
+    The decorator automatically handles registration and uses the Pydantic model (`EchoParams`, `FetchJsonParams`) for input validation and schema generation. Notice that the `input_schema` parameter is *not* passed to the decorator; it's inferred from the type hint.
 
 ## Defining Resources
 
@@ -171,6 +230,10 @@ Resources expose data to the client. They are identified by URIs.
 Currently, the TypeScript SDK's type definitions (`ReadResourceTemplateCallback`) do not seem to automatically infer the types of parameters defined in the `ResourceTemplate` (e.g., `{name}`) into the second argument (`variables`). This means a signature like `async (uri, { name }) => { ... }` will likely cause a TypeScript error.
 
 The recommended workaround is to type the second argument as `any` and manually extract/validate the parameters within the handler function. **Be cautious when accessing properties on `handlerArgs: any`**, as they lack compile-time checks. Consider adding runtime checks or type guards if necessary for robustness.
+
+**Note on Resource Handler Return Types (TypeScript):**
+
+Due to potential type mismatches encountered with `@modelcontextprotocol/sdk@1.8.0`, the return type for resource handlers in the example (`hello-resource` and the `greetingHandler` template) has been temporarily set to `Promise<any>`. This bypasses strict TypeScript checking to allow the server to run correctly. This should ideally be revisited if clearer type definitions or examples become available for this SDK version.
 
 ```typescript
 // examples/typescript-minimal/src/server.ts

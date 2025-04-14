@@ -42,22 +42,45 @@ This server demonstrates key MCP features:
     - Arguments:
       - `text_to_summarize` (string, required)
 
+## Requirements
+
+*   Python 3.8+
+*   pip (Python package installer)
+
 ## Setup
 
-1.  **Prerequisites:** Ensure you have Python 3.8+ and `pip` installed.
-2.  **Install Dependencies:** Navigate to this directory (`examples/python-minimal`) in your terminal. The required packages are listed in `requirements.txt` (`mcp-sdk`, `pydantic`, `aiohttp`). Install them using:
+1.  **Navigate to the example directory:**
+    ```bash
+    cd examples/python-minimal
+    ```
+2.  **Create a virtual environment:**
+    It's highly recommended to use a virtual environment to manage dependencies.
+    ```bash
+    python3 -m venv venv
+    ```
+3.  **Activate the virtual environment:**
+    *   On macOS/Linux:
+        ```bash
+        source venv/bin/activate
+        ```
+    *   On Windows:
+        ```bash
+        .\venv\Scripts\activate
+        ```
+    You should see `(venv)` prefixed to your shell prompt.
+4.  **Install dependencies:**
+    Install the required MCP SDK and other libraries.
     ```bash
     pip install -r requirements.txt
     ```
 
 ## Running the Server
 
-Execute the server script directly:
-
-```bash
-python server.py
-```
-
+1.  **Ensure your virtual environment is active** (see Setup step 3).
+2.  **Start the server:**
+    ```bash
+    python server.py
+    ```
 The server will start and listen for MCP connections via standard input/output (stdio).
 
 ## Usage
@@ -129,5 +152,16 @@ This will show the available tools, resources, and prompts.
 ## Logging
 
 The server uses Python's standard `logging` module. Informational messages (like tool calls) and errors (like division by zero) will be printed to the standard error stream where the server is running.
+
+## Deactivating the Virtual Environment (Optional)
+
+When you are finished working with the server, you can deactivate the virtual environment:
+```bash
+deactivate
+```
+
+## Notes
+
+*   The server communicates over `stdio` by default.
 
 For detailed information on the Model Context Protocol, refer to the [official specification](https://github.com/modelcontext/specification).
