@@ -204,4 +204,4 @@ Details of client implementation are outside the scope of this server guide.
 
 ## Next Steps
 
-Explore the `examples/` directory for runnable Python and TypeScript servers demonstrating these concepts.
+Explore the `examples/` directory within this repository for fully runnable Python and TypeScript servers demonstrating these concepts. Each example includes its own README with specific setup and usage instructions.
