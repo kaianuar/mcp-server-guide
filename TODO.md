@@ -12,11 +12,22 @@ This file tracks ongoing tasks, planned enhancements, and potential improvements
 
 ## Example Enhancements
 
-- [ ] Add more complex/realistic examples:
-    - [ ] Example demonstrating server-side sampling (if client supports).
-    - [ ] Example using logging capabilities.
-    - [ ] Example tool interacting with a real external API (requires handling secrets/auth).
-    - [ ] Example resource reading from/writing to a local file (consider security implications).
+- **Sampling:**
+  - [ ] Python: Add a resource/tool demonstrating sampling parameters (e.g., returning different text based on `temperature`).
+  - [ ] TypeScript: Add a resource/tool demonstrating sampling.
+  - [ ] Update relevant READMEs to explain sampling example.
+- **Logging:**
+  - [ ] Python: Show effective use of Python's `logging` within tool/resource handlers (different levels, context).
+  - [ ] TypeScript: Show effective use of `console.log` or a simple logger within handlers.
+  - [ ] Update relevant READMEs to highlight logging practices shown.
+- **External APIs:**
+  - [ ] Python: Add a tool calling a public API (e.g., weather, jokes) using `aiohttp`, showing async pattern and basic error handling. Mention secure API key handling (env vars).
+  - [ ] TypeScript: Add a tool calling a public API using `fetch`. Mention secure API key handling.
+  - [ ] Update relevant READMEs with API tool example.
+- **File I/O:**
+  - [ ] Python: Add `read_file` and `write_file` tools using `aiofiles` (async), emphasizing security/path validation.
+  - [ ] TypeScript: Add `readFile` and `writeFile` tools using Node.js `fs/promises`, emphasizing security.
+  - [ ] Update relevant READMEs with file I/O examples and security notes.
 
 ## Code & SDK Issues
 
