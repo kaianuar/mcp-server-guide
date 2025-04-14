@@ -11,6 +11,7 @@ This server demonstrates:
 - Implementing a dynamic `greeting` resource (`mcp-resource://enhanced-typescript-server/greeting/{name}`).
 - Implementing an asynchronous `fetch-json` tool that retrieves JSON data from a URL.
 - Implementing a `summarize-text` prompt template.
+- Implementing a `creative_response` tool that generates a creative text response based on a prompt.
 - Server-side logging using `console.error`.
 - Running the server using the `StdioServerTransport`.
 
@@ -21,6 +22,18 @@ This server demonstrates:
   - `calculate`: Takes two numbers and an operation (+, -, *, /) and returns the result.
   - `fetch-json`: Takes a URL and returns the fetched JSON data, pretty-printed.
     *   **Error Handling:** Note that the `fetch-json` handler uses a `try...catch` block and `throw new Error(...)` to signal errors. The MCP SDK catches these errors and formats the response.
+  - `creative_response`: Generates a creative text response based on a prompt, with randomness controlled by a `temperature` parameter.
+    *   **Arguments (Zod schema):**
+      - `prompt` (string, required): The input text prompt.
+      - `temperature` (float, optional, default: 0.7, range: 0.0-1.0): Controls the randomness of the response selection. Lower values (e.g., 0.1) are more deterministic, while higher values (e.g., 0.9) are more random.
+    *   **Returns:** `string` (the generated response).
+    *   **Example Call (JSON Arguments):**
+      ```json
+      {
+        "prompt": "Explain quantum physics simply",
+        "temperature": 0.5
+      }
+      ```
 - **Resources:**
   - `mcp-resource://enhanced-typescript-server/hello`: A static resource returning a greeting message (`text/plain`).
   - `mcp-resource://enhanced-typescript-server/greeting/{name}`: A dynamic resource returning a personalized greeting based on the `{name}` provided in the URI (`text/plain`).
@@ -116,7 +129,13 @@ mcp-cli tool fetch-json --url https://jsonplaceholder.typicode.com/posts/1
 mcp-cli prompt summarize-text --text_to_summarize "TypeScript is a free and open-source high-level programming language developed by Microsoft that adds static typing with optional type annotations to JavaScript."
 ```
 
-**7. Disconnect:**
+**7. Use the `creative_response` tool:**
+
+```bash
+mcp-cli tool creative_response --prompt "Explain quantum physics simply" --temperature 0.5
+```
+
+**8. Disconnect:**
 
 ```
 > disconnect

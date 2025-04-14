@@ -208,6 +208,68 @@ server.tool(
   }
 );
 
+// --- Tool: creative_response --- //
+const CreativeResponseParams = z.object({
+  prompt: z.string().describe('The input prompt for the creative response.'),
+  temperature: z.number()
+    .min(0.0)
+    .max(1.0)
+    .default(0.7)
+    .describe('Controls randomness. Lower values are more deterministic, higher values are more random.'),
+});
+
+// Define the handler function for the creative_response tool
+async function handleCreativeResponse(
+  params: z.infer<typeof CreativeResponseParams>
+): Promise<{ content: TextContent[] }> { // Match other TS tool return types
+  console.log(`Tool 'creative_response' called with prompt: '${params.prompt}', temperature: ${params.temperature}`);
+
+  // Predefined responses
+  const responses = [
+    `A very straightforward answer about: ${params.prompt}`,
+    `Thinking outside the box regarding: ${params.prompt}`,
+    `A whimsical take on: ${params.prompt}`,
+    `Let's get abstract with: ${params.prompt}`,
+  ];
+
+  let chosenResponse: string;
+
+  // Simple logic based on temperature
+  if (params.temperature < 0.3) {
+    // Low temperature -> more deterministic
+    chosenResponse = responses[0];
+    console.debug('Low temperature, choosing deterministic response.');
+  } else if (params.temperature > 0.8) {
+    // High temperature -> more random (choose from all)
+    const randomIndex = Math.floor(Math.random() * responses.length);
+    chosenResponse = responses[randomIndex];
+    console.debug('High temperature, choosing random response from all options.');
+  } else {
+    // Medium temperature -> slightly less deterministic (choose from first two)
+    const randomIndex = Math.floor(Math.random() * 2); // Only indices 0 or 1
+    chosenResponse = responses[randomIndex];
+    console.debug('Medium temperature, choosing random response from first two options.');
+  }
+
+  console.log(`Tool 'creative_response' completed. Response: '${chosenResponse}'`);
+  return {
+    content: [
+      {
+        type: "text",
+        text: chosenResponse
+      } satisfies TextContent
+    ]
+  };
+}
+
+// Register the creative_response tool
+server.tool(
+  'creative_response', // name
+  'Generates a creative response based on a prompt, influenced by temperature.', // description
+  CreativeResponseParams.shape, // schema shape
+  handleCreativeResponse // handler
+);
+
 // --- Resources --- //
 
 // 3. Define the hello resource handler

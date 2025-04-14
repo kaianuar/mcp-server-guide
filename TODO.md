@@ -14,7 +14,7 @@ This file tracks ongoing tasks, planned enhancements, and potential improvements
 
 - **Sampling:**
   - [x] Python: Add a resource/tool demonstrating sampling parameters (e.g., returning different text based on `temperature`). (*Note: Tool works correctly, but testing via Cascade's direct tool calls on the background process may cause instability due to environment interaction; test with an external client.*)
-  - [ ] TypeScript: Add a resource/tool demonstrating sampling.
+  - [x] TypeScript: Add a resource/tool demonstrating sampling.
   - [x] Update relevant READMEs to explain sampling example.
 - **Logging:**
   - [ ] Python: Show effective use of Python's `logging` within tool/resource handlers (different levels, context).
