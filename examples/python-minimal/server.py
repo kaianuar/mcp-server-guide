@@ -61,9 +61,17 @@ class FetchJsonParams(BaseModel):
     description="Fetches JSON data from a given URL.",
     input_schema=FetchJsonParams,
 )
-async def fetch_json(params: FetchJsonParams) -> dict:
+async def fetch_json(params: FetchJsonParams) -> str:
     """
     Asynchronously fetches JSON content from a URL.
+
+    Raises:
+        ValueError: If the response content type is not JSON or JSON decoding fails.
+        aiohttp.ClientResponseError: For HTTP status errors (4xx, 5xx).
+        aiohttp.ClientConnectionError: For connection-related errors.
+        asyncio.TimeoutError: If the request times out.
+        aiohttp.ClientError: For other client-side HTTP errors.
+        Exception: For unexpected errors during the process.
     """
     url_str = str(params.url) # Convert pydantic HttpUrl back to string for aiohttp
     log.info(f"Tool 'fetch-json' called with URL: {url_str}")
@@ -71,37 +79,49 @@ async def fetch_json(params: FetchJsonParams) -> dict:
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(url_str) as response:
-                response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
+                # Raise ClientResponseError for bad status codes (4xx or 5xx)
+                # This is caught by the except block below
+                response.raise_for_status()
+
+                # Check content type before decoding
+                content_type = response.headers.get('Content-Type', '')
+                if 'application/json' not in content_type:
+                     log.error(f"Invalid content type received from URL: {url_str}, Content-Type: '{content_type}'. Expected JSON.")
+                     raise ValueError(f"Response content type is not JSON (got '{content_type}')")
+
                 try:
-                    # Check content type before decoding
-                    if 'application/json' not in response.headers.get('Content-Type', ''):
-                         log.error(f"Invalid content type received from URL: {url_str}, expected JSON.")
-                         return {"error": {"message": "Response content type is not JSON."}}
-                    json_data = await response.json(content_type=None) # Use content_type=None to bypass strict check, already checked manually
-                    return {"content": [{"type": "text", "text": json.dumps(json_data, indent=2)}]}
-                except json.JSONDecodeError:
-                    log.error(f"Failed to decode JSON from URL: {url_str}")
-                    return {"error": {"message": "Failed to decode JSON from response."}}
-                # ContentTypeError might not be needed if checking manually
-                # except aiohttp.ContentTypeError:
-                #      logger.error(f"Invalid content type received from URL: {url_str}, expected JSON.")
-                #      return {"error": {"message": "Response content type is not JSON."}}
+                    # Use content_type=None to bypass strict check, already checked manually
+                    json_data = await response.json(content_type=None)
+                    # Return the JSON data as a pretty-printed string directly
+                    return json.dumps(json_data, indent=2)
+                except json.JSONDecodeError as e:
+                    log.error(f"Failed to decode JSON from URL: {url_str}: {e}")
+                    raise ValueError(f"Failed to decode JSON from response: {e}")
 
     except aiohttp.ClientResponseError as e:
         log.error(f"HTTP error fetching URL {url_str}: Status {e.status}, Message: {e.message}")
-        return {"error": {"message": f"HTTP error: {e.status} {e.message}"}}
+        # Re-raise the specific HTTP error
+        raise
     except aiohttp.ClientConnectionError as e:
         log.error(f"Connection error fetching URL {url_str}: {e}")
-        return {"error": {"message": f"Connection error: {e}"}}
-    except aiohttp.ClientError as e:
+        # Re-raise the specific connection error
+        raise
+    except aiohttp.ClientError as e: # Catch other general client errors
         log.error(f"General HTTP client error fetching URL {url_str}: {e}")
-        return {"error": {"message": f"HTTP client error: {e}"}}
+        # Re-raise the specific client error
+        raise
     except asyncio.TimeoutError:
          log.error(f"Request timed out fetching URL {url_str}")
-         return {"error": {"message": "Request timed out."}}
-    except Exception as e:
-        log.exception(f"Unexpected error fetching URL {url_str}: {e}")
-        return {"error": {"message": f"An unexpected error occurred: {e}"}}
+         # Re-raise the timeout error
+         raise
+    except ValueError as e: # Catch specific ValueErrors raised above
+        log.error(f"Data validation error for URL {url_str}: {e}")
+        # Re-raise the ValueError (e.g., bad content type, JSON decode error)
+        raise
+    except Exception as e: # Catch any other unexpected errors
+        log.exception(f"Unexpected error fetching URL {url_str}: {e}") # Use log.exception
+        # Re-raise the unexpected error
+        raise
 
 # --- Resources --- #
 

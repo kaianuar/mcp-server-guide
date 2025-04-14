@@ -6,11 +6,18 @@ This directory contains an enhanced minimal example of a Model Context Protocol 
 
 This server demonstrates key MCP features:
 
-- **Initialization:** Sets up an MCP server named `enhanced-python-server`.
-- **Tools:** Provides a `calculate` tool and an asynchronous `fetch-json` tool.
-- **Resources:** Offers a static `hello` resource and a dynamic `greeting` resource.
-- **Prompts:** Includes a `summarize-text` prompt template.
-- **Logging:** Basic logging is integrated.
++*   **SDK Usage:** Uses the `mcp-sdk` Python package (often imported as `mcp`).
+*   **Initialization:** Sets up an MCP server named `enhanced-python-server`.
+*   **Tools:**
+    *   `calculate`: A synchronous tool performing arithmetic.
+    *   `fetch-json`: An asynchronous tool fetching JSON from a URL, demonstrating error handling via exceptions.
+*   **Input Validation:** Uses [Pydantic](https://docs.pydantic.dev/) models to define and validate input schemas for tools (like `fetch-json`).
+*   **Resources:**
+    *   `hello`: A static resource providing plain text.
+    *   `greeting`: A dynamic resource using a URI template (`{name}`) to provide personalized text.
+*   **Prompts:** Includes a `summarize-text` prompt template.
+*   **Metadata:** Registers optional metadata for resources and prompts (`add_resource_metadata`, `add_prompt_metadata`) to aid client discovery.
+*   **Logging:** Basic logging is integrated.
 
 ## Capabilities
 
@@ -22,7 +29,8 @@ This server demonstrates key MCP features:
       - `b` (float, required)
       - `operation` (string, optional, default: 'add', options: 'add', 'subtract', 'multiply', 'divide')
     - Returns: `string`
-  - `fetch-json`: Takes a URL and asynchronously fetches JSON data, returning it as a string.
+  - `fetch-json`: Takes a URL (`url`) and asynchronously fetches JSON data, returning it as a pretty-printed string.
+    - **Error Handling:** This tool demonstrates robust error handling. If issues occur (network error, timeout, invalid content type, JSON decode error), it raises appropriate exceptions (e.g., `ValueError`, `aiohttp.ClientError`). The MCP SDK catches these and reports an error to the client.
     - Arguments:
       - `url` (string): The URL to fetch JSON data from.
     - Returns: `string` (the fetched JSON data, pretty-printed) or an error message.
@@ -37,7 +45,7 @@ This server demonstrates key MCP features:
 ## Setup
 
 1.  **Prerequisites:** Ensure you have Python 3.8+ and `pip` installed.
-2.  **Install Dependencies:** Navigate to this directory (`examples/python-minimal`) in your terminal and run:
+2.  **Install Dependencies:** Navigate to this directory (`examples/python-minimal`) in your terminal. The required packages are listed in `requirements.txt` (`mcp-sdk`, `pydantic`, `aiohttp`). Install them using:
     ```bash
     pip install -r requirements.txt
     ```
@@ -54,7 +62,12 @@ The server will start and listen for MCP connections via standard input/output (
 
 ## Usage
 
-Once the server is running (using `python server.py`), you can interact with it using the `mcp-cli`. Ensure you have `mcp-cli` installed (`npm install -g @modelcontextprotocol/cli`).
+Once the server is running (using `python server.py`), you can interact with it using the `mcp-cli`.
+
+**Install `mcp-cli` (if you haven't already):**
+```bash
+npm install -g @modelcontextprotocol/cli
+```
 
 **Connect to the Server:**
 

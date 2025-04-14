@@ -6,7 +6,7 @@ This file tracks ongoing tasks, planned enhancements, and potential improvements
 
 - [x] Enhance `mcp_server_guide.md` for newcomers (add Getting Started, Running, schema explanations, etc.). (Commit: `9b54399`)
 - [x] Update `examples/typescript-minimal/README.md` with notes on error handling and dynamic resource signature workaround. (Commit: `9b54399`)
-- [ ] Review `examples/python-minimal/` documentation (`README.md`, code comments) from a "zero knowledge" perspective.
+- [x] Review `examples/python-minimal/` documentation (`README.md`, code comments) from a "zero knowledge" perspective and align `fetch-json` error handling.
 - [ ] Minor refinement: Explicitly mention the `/examples` directory in `mcp_server_guide.md` as runnable starting points.
 - [ ] Minor refinement: Consider improving the intro diagram in `mcp_server_guide.md` (optional).
 
@@ -20,6 +20,7 @@ This file tracks ongoing tasks, planned enhancements, and potential improvements
 
 ## Code & SDK Issues
 
+- [ ] Investigate `FastMCP` vs `Server` class naming in python `mcp-sdk` (used in example vs mentioned in guide).
 - [ ] Keep track of TypeScript SDK updates regarding type inference for `ResourceTemplate` callbacks (currently requires `handlerArgs: any`).
 
 ## Other
