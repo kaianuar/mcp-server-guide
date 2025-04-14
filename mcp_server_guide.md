@@ -145,8 +145,6 @@ You'll see these used extensively in the examples to ensure data passed to your 
 
 Tools represent actions or functions the server can perform when requested by the client.
 
-{{ ... }}
-
 **Error Handling in Tools:**
 
 If a tool encounters an error during execution (e.g., failed network request, invalid calculation), it should **throw an Error** (or a custom subclass of Error).
@@ -213,5 +211,3 @@ Details of client implementation are outside the scope of this server guide.
 ## Next Steps
 
 Explore the `examples/` directory within this repository for fully runnable Python and TypeScript servers demonstrating these concepts. Each example includes its own README with specific setup and usage instructions.
-
-{{ ... }}
