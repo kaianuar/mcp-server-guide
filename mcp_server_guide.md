@@ -7,19 +7,26 @@ The Model Context Protocol (MCP) provides a standardized way for Large Language 
 **Core Interaction Flow:**
 
 ```
-+-----------------+      +-----------------+      +--------------------+
-| LLM Application | ---- |    MCP Server   | ---- | External Data/Tool |
-|    (Client)     |      | (Your Code Here)|      | (Database, API, etc)|
-+-----------------+      +-----------------+      +--------------------+
-     (Requests:             (Implements Tools,
-  Call Tool, Read          Resources, Prompts)
-   Resource, etc)
-                            (Handles Requests,
-                         Interacts with External)
-
-     (Receives:
-  Tool Output, Resource
-    Content, etc)
++ +---------------------+        MCP / JSON-RPC        +---------------------+      +--------------------+
++ |                     | <--------------------------> |                     | ---> | External Data/Tool |
++ |   LLM Application   |                              |     MCP Server      |      | (Database, API, etc)|
++ |      (Client)       |                              |   (Your Code Here)  | <--- |                    |
++ |                     |                              |                     |      +--------------------+
++ +---------------------+                              +---------------------+
++           |
++           | 1. Client connects & discovers capabilities (Tools, Resources, Prompts)
++           |    (e.g., via stdio, SSE)
++           |
++           | 2. Client sends request (e.g., callTool, readResource)
++           |-------------------------------------------->|
++           |
++           | 3. Server handler executes, potentially interacts with External Data/Tool
++           |
++           | 4. Server sends response (tool output, resource content, error)
++           |<--------------------------------------------|
++           |
++           | (...repeat steps 2-4...)
++
 ```
 
 This guide explains how to build the **MCP Server** component using the official TypeScript and Python SDKs.

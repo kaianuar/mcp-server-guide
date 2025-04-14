@@ -8,7 +8,7 @@ This file tracks ongoing tasks, planned enhancements, and potential improvements
 - [x] Update `examples/typescript-minimal/README.md` with notes on error handling and dynamic resource signature workaround. (Commit: `9b54399`)
 - [x] Review `examples/python-minimal/` documentation (`README.md`, code comments) from a "zero knowledge" perspective and align `fetch-json` error handling.
 - [x] Minor refinement: Explicitly mention the `/examples` directory in `mcp_server_guide.md` as runnable starting points.
-- [ ] Minor refinement: Consider improving the intro diagram in `mcp_server_guide.md` (optional).
+- [x] Minor refinement: Consider improving the intro diagram in `mcp_server_guide.md` (optional).
 
 ## Example Enhancements
 
