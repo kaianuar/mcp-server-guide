@@ -12,6 +12,7 @@ This server demonstrates:
 - Implementing an asynchronous `fetch-json` tool that retrieves JSON data from a URL.
 - Implementing a `summarize-text` prompt template.
 - Implementing a `creative_response` tool that generates a creative text response based on a prompt.
+- Implementing `readFile` and `writeFile` tools for accessing files within a safe `sandbox` directory.
 - Server-side logging using `console.error`.
 - Running the server using the `StdioServerTransport`.
 
@@ -19,7 +20,7 @@ This server demonstrates:
 
 - **Tools:**
   - `echo`: Takes a string message and returns it.
-  - `calculate`: Takes two numbers and an operation (+, -, *, /) and returns the result.
+  - `calculate`: Takes two numbers and an operation (+, -, \*, /) and returns the result.
   - `fetch-json`: Takes a URL and returns the fetched JSON data, pretty-printed.
     *   **Error Handling:** Note that the `fetch-json` handler uses a `try...catch` block and `throw new Error(...)` to signal errors. The MCP SDK catches these errors and formats the response.
   - `creative_response`: Generates a creative text response based on a prompt, with randomness controlled by a `temperature` parameter.
@@ -34,6 +35,8 @@ This server demonstrates:
         "temperature": 0.5
       }
       ```
+  - `readFile`: Asynchronously reads content from a file within a safe `sandbox` directory.
+  - `writeFile`: Asynchronously writes content to a file within a safe `sandbox` directory.
 - **Resources:**
   - `mcp-resource://enhanced-typescript-server/hello`: A static resource returning a greeting message (`text/plain`).
   - `mcp-resource://enhanced-typescript-server/greeting/{name}`: A dynamic resource returning a personalized greeting based on the `{name}` provided in the URI (`text/plain`).
@@ -135,11 +138,65 @@ mcp-cli prompt summarize-text --text_to_summarize "TypeScript is a free and open
 mcp-cli tool creative_response --prompt "Explain quantum physics simply" --temperature 0.5
 ```
 
-**8. Disconnect:**
+**8. Use the `writeFile` tool (creates sandbox/hello_ts.txt):**
+
+```bash
+mcp-cli tool writeFile --filename "hello_ts.txt" --content "Hello from the writeFile tool (TS)!"
+```
+
+**9. Use the `readFile` tool (reads sandbox/hello_ts.txt):**
+
+```bash
+mcp-cli tool readFile --filename "hello_ts.txt"
+```
+
+**10. Disconnect:**
 
 ```
 > disconnect
 # or Ctrl+C
+```
+
+### `readFile`
+
+Reads the text content of a specified file. **Note:** For security, this tool can only access files within the `examples/typescript-minimal/sandbox/` directory.
+
+**Parameters:**
+
+*   `filename` (string, required): The name of the file to read (relative to the sandbox directory).
+
+**Returns:** An MCP content object containing the file content (`{ content: [{ type: 'text', text: '...' }] }`) or throws an error.
+
+**Example Call (JSON Arguments):**
+
+```json
+{
+  "params": {
+    "filename": "data_from_ts.txt"
+  }
+}
+```
+
+### `writeFile`
+
+Writes text content to a specified file. **Note:** For security, this tool can only write files within the `examples/typescript-minimal/sandbox/` directory. It will create the file if it doesn't exist, or overwrite it if it does.
+
+**Parameters:**
+
+*   `filename` (string, required): The name of the file to write (relative to the sandbox directory).
+*   `content` (string, required): The text content to write.
+
+**Returns:** An MCP content object containing a success message (`{ content: [{ type: 'text', text: '...' }] }`) or throws an error.
+
+**Example Call (JSON Arguments):**
+
+```json
+{
+  "params": {
+    "filename": "ts_output.log",
+    "content": "Log entry from TypeScript: Process completed."
+  }
+}
 ```
 
 For detailed information on the Model Context Protocol, refer to the [official specification](https://github.com/modelcontext/specification).

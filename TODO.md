@@ -27,7 +27,7 @@ This file tracks ongoing tasks, planned enhancements, and potential improvements
   - [x] Update relevant READMEs with API tool example.
 - **File I/O:**
   - [x] Python: Add `read_file` and `write_file` tools using `aiofiles` (async), emphasizing security/path validation.
-  - [ ] TypeScript: Add `readFile` and `writeFile` tools using Node.js `fs/promises`, emphasizing security.
+  - [x] TypeScript: Add `readFile` and `writeFile` tools using Node.js `fs/promises`, emphasizing security.
   - [ ] Update relevant READMEs with file I/O examples and security notes.
 
 ## Code & SDK Issues

@@ -2,6 +2,8 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { ResourceContents, TextContent, Prompt, PromptArgument } from "@modelcontextprotocol/sdk/types.js";
+import { promises as fs } from "fs"; // For async file I/O
+import path from "path"; // For path manipulation
 
 // --- Logger Helper ---
 // Helper to ensure logs go to stderr for stdio transport
@@ -9,6 +11,40 @@ const logInfo = (...args: any[]) => console.error(`[INFO] ${new Date().toISOStri
 const logWarn = (...args: any[]) => console.error(`[WARN] ${new Date().toISOString()}`, ...args);
 const logError = (...args: any[]) => console.error(`[ERROR] ${new Date().toISOString()}`, ...args);
 const logDebug = (...args: any[]) => console.error(`[DEBUG] ${new Date().toISOString()}`, ...args); // Using console.error for visibility
+
+// --- Sandbox Setup --- //
+const SANDBOX_DIR = path.resolve(__dirname, "..", "sandbox"); // Resolve path relative to dist/src
+
+// Function to ensure sandbox exists (call this once during server init)
+async function ensureSandboxExists() {
+  try {
+    await fs.mkdir(SANDBOX_DIR, { recursive: true });
+    logInfo(`Sandbox directory ensured at: ${SANDBOX_DIR}`);
+  } catch (error) {
+    logError(`Failed to create sandbox directory at ${SANDBOX_DIR}:`, error);
+    // Decide if this is a fatal error for your server
+    process.exit(1); // Example: exit if sandbox can't be created
+  }
+}
+
+// Helper to resolve and validate paths within the sandbox
+function _resolveSandboxPath(filename: string): string {
+  // Basic sanitization: remove leading/trailing slashes and resolve '..'
+  const normalizedFilename = path.normalize(filename).replace(/^\/+/, '').replace(/\+$/, '');
+
+  // Prevent potentially harmful filenames
+  if (normalizedFilename.includes('..') || path.isAbsolute(normalizedFilename)) {
+      throw new Error(`Invalid filename format: '${filename}' contains '..' or is absolute.`);
+  }
+
+  const resolvedPath = path.resolve(SANDBOX_DIR, normalizedFilename);
+
+  // Security Check: Ensure the resolved path is STRICTLY within the sandbox
+  if (!resolvedPath.startsWith(SANDBOX_DIR + path.sep) && resolvedPath !== SANDBOX_DIR) {
+      throw new Error(`Path escape attempt: '${filename}' resolves outside the sandbox.`);
+  }
+  return resolvedPath;
+}
 
 // --- Server Setup --- //
 
@@ -270,6 +306,88 @@ server.tool(
   handleCreativeResponse // handler
 );
 
+// --- File I/O Tools --- //
+
+// Schema for readFile parameters
+const ReadFileParamsSchema = z.object({
+  filename: z.string().describe("The name of the file to read within the sandbox."),
+});
+
+server.tool(
+  "readFile",
+  "Reads the content of a specified file within the server's sandbox directory.",
+  ReadFileParamsSchema.shape,
+  async (params: z.infer<typeof ReadFileParamsSchema>): Promise<{ content: TextContent[] }> => {
+    try {
+      const targetPath = _resolveSandboxPath(params.filename);
+      logInfo(`Attempting to read file: ${targetPath}`);
+
+      // Check if it's actually a file before reading
+      const stats = await fs.stat(targetPath);
+      if (!stats.isFile()) {
+        logWarn(`Attempted to read a non-file: ${targetPath}`);
+        throw new Error(`'${params.filename}' is not a regular file.`);
+      }
+
+      const content = await fs.readFile(targetPath, { encoding: 'utf-8' });
+      logInfo(`Successfully read file: ${targetPath}`);
+      // Wrap the string in the expected MCP content structure
+      return { content: [{ type: 'text', text: content }] };
+    } catch (error: any) {
+      // Handle specific errors like file not found
+      if (error.code === 'ENOENT') {
+         logWarn(`File not found: ${params.filename}`);
+         throw new Error(`File not found: ${params.filename}`);
+      }
+      logError(`Error reading file '${params.filename}':`, error.message || error);
+      // Re-throw other errors to be handled by MCP SDK (as JSON-RPC errors)
+      throw new Error(`Could not read file '${params.filename}'. Reason: ${error.message || error}`);
+    }
+  }
+);
+
+// Schema for writeFile parameters
+const WriteFileParamsSchema = z.object({
+  filename: z.string().describe("The name of the file to write within the sandbox."),
+  content: z.string().describe("The text content to write to the file."),
+});
+
+server.tool(
+  "writeFile",
+  "Writes text content to a specified file within the server's sandbox directory.",
+  WriteFileParamsSchema.shape,
+  async (params: z.infer<typeof WriteFileParamsSchema>): Promise<{ content: TextContent[] }> => {
+    try {
+      const targetPath = _resolveSandboxPath(params.filename);
+      logInfo(`Attempting to write to file: ${targetPath}`);
+
+      // Check if path exists and is a directory (prevent overwriting directories)
+      try {
+         const stats = await fs.stat(targetPath);
+         if (stats.isDirectory()) {
+            logWarn(`Attempted to write to a directory: ${targetPath}`);
+            throw new Error(`Cannot write to '${params.filename}' as it is a directory.`);
+         }
+      } catch (statError: any) {
+          if (statError.code !== 'ENOENT') {
+             throw statError; // Re-throw unexpected stat errors
+          }
+          // ENOENT is expected if the file doesn't exist yet, continue.
+      }
+
+      await fs.writeFile(targetPath, params.content, { encoding: 'utf-8' });
+      logInfo(`Successfully wrote to file: ${targetPath}`);
+      // Wrap the success message in the expected MCP content structure
+      const successMessage = `Successfully wrote content to '${params.filename}'.`;
+      return { content: [{ type: 'text', text: successMessage }] };
+    } catch (error: any) {
+      logError(`Error writing file '${params.filename}':`, error.message || error);
+      // Re-throw error to be handled by MCP SDK
+      throw new Error(`Could not write to file '${params.filename}'. Reason: ${error.message || error}`);
+    }
+  }
+);
+
 // --- Resources --- //
 
 // 3. Define the hello resource handler
@@ -363,6 +481,7 @@ server.prompt(
 
 // 5. Run the server using stdio transport
 async function main() {
+  await ensureSandboxExists(); // Ensure sandbox is ready before starting
   logInfo(`Starting MCP server '${serverOptions.name}' version ${serverOptions.version}...`);
   const transport = new StdioServerTransport();
   try {
