@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ResourceContents, TextContent, Prompt, PromptArgument } from "@modelcontextprotocol/sdk/types.js";
 import { promises as fs } from "fs"; // For async file I/O
 import path from "path"; // For path manipulation
+import * as url from 'url'; // Import the url module
 
 // --- Logger Helper ---
 // Helper to ensure logs go to stderr for stdio transport
@@ -13,15 +14,19 @@ const logError = (...args: any[]) => console.error(`[ERROR] ${new Date().toISOSt
 const logDebug = (...args: any[]) => console.error(`[DEBUG] ${new Date().toISOString()}`, ...args); // Using console.error for visibility
 
 // --- Sandbox Setup --- //
+const __filename = url.fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const SANDBOX_DIR = path.resolve(__dirname, "..", "sandbox"); // Resolve path relative to dist/src
 
 // Function to ensure sandbox exists (call this once during server init)
 async function ensureSandboxExists() {
   try {
+    logInfo(`Attempting to ensure sandbox directory: ${SANDBOX_DIR}`);
     await fs.mkdir(SANDBOX_DIR, { recursive: true });
     logInfo(`Sandbox directory ensured at: ${SANDBOX_DIR}`);
   } catch (error) {
-    logError(`Failed to create sandbox directory at ${SANDBOX_DIR}:`, error);
+    logError(`!!! Critical Error: Failed to create sandbox directory at ${SANDBOX_DIR}. !!!`);
+    logError("Full error:", error); // Log the full error object
     // Decide if this is a fatal error for your server
     process.exit(1); // Example: exit if sandbox can't be created
   }
@@ -481,7 +486,9 @@ server.prompt(
 
 // 5. Run the server using stdio transport
 async function main() {
+  logInfo("Calling ensureSandboxExists()...");
   await ensureSandboxExists(); // Ensure sandbox is ready before starting
+  logInfo("ensureSandboxExists() completed.");
   logInfo(`Starting MCP server '${serverOptions.name}' version ${serverOptions.version}...`);
   const transport = new StdioServerTransport();
   try {
