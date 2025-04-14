@@ -30,6 +30,30 @@ This file tracks ongoing tasks, planned enhancements, and potential improvements
   - [x] TypeScript: Add `readFile` and `writeFile` tools using Node.js `fs/promises`, emphasizing security.
   - [x] Update relevant READMEs with file I/O examples and security notes.
 
+### Advanced Features
+- **Tool Annotations:**
+  - [ ] Python: Add MCP standard annotations (`title`, `readOnlyHint`, etc.) to tools.
+  - [ ] TypeScript: Add MCP standard annotations to tools.
+- **Sampling Protocol:**
+  - [ ] Python: Implement example server requesting completion via `sampling/createMessage`.
+  - [ ] TypeScript: Implement example server requesting completion via `sampling/createMessage`.
+- **Progress Reporting:**
+  - [ ] Python: Demonstrate progress updates for a long-running tool.
+  - [ ] TypeScript: Demonstrate progress updates for a long-running tool.
+- **Streaming Responses:**
+  - [ ] Python: Implement a tool that streams data back to the client.
+  - [ ] TypeScript: Implement a tool that streams data back to the client.
+- **Binary Resources:**
+  - [ ] Python: Add example handling binary resource data (e.g., images).
+  - [ ] TypeScript: Add example handling binary resource data (e.g., images).
+- **Resource Subscriptions:**
+  - [ ] Python: Implement resource updates/notifications (`workspace/didChangeWatchedFiles` or similar).
+  - [ ] TypeScript: Implement resource updates/notifications.
+- **Testing:**
+  - [ ] Python: Add unit tests for tools/handlers.
+  - [ ] TypeScript: Add unit tests for tools/handlers.
+  - [ ] Add integration tests using MCP client for both servers.
+
 ## Code & SDK Issues
 
 - [ ] Keep track of TypeScript SDK updates regarding type inference for `ResourceTemplate` callbacks (currently requires `handlerArgs: any`).
