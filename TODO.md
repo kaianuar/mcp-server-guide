@@ -31,7 +31,6 @@ This file tracks ongoing tasks, planned enhancements, and potential improvements
 
 ## Code & SDK Issues
 
-- [ ] Investigate `FastMCP` vs `Server` class naming in python `mcp-sdk` (used in example vs mentioned in guide).
 - [ ] Keep track of TypeScript SDK updates regarding type inference for `ResourceTemplate` callbacks (currently requires `handlerArgs: any`).
 
 ## Other

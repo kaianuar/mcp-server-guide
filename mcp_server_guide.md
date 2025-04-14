@@ -92,41 +92,42 @@ Every MCP server starts by instantiating the `Server` class:
     ```
 
 *   **Python (`server.py`):**
+    The Python SDK provides `FastMCP`, a high-level, decorator-based class (inspired by frameworks like FastAPI) for easily defining server capabilities. It's the recommended starting point.
     ```python
-    from mcp_sdk.server import Server
-    # Required for stdio communication
-    from mcp_sdk.server.stdio import StdioServerTransport
+    from mcp_sdk import FastMCP # Use FastMCP for the high-level interface
+    # StdioServerTransport might be needed depending on how you run it
+    # from mcp_sdk.server.stdio import StdioServerTransport
     import asyncio
+    import sys
+    import logging # Added for clarity
 
-    server = Server(
-        name="my-cool-mcp-server",
-        version="1.0.0",
-        capabilities={
-            "tools": {},
-            "resources": {},
-            # "prompts": {},
-            # "logging": {},
-        }
+    log = logging.getLogger(__name__) # Basic logger setup
+    mcp = FastMCP(
+        "my-cool-mcp-server", # Server name
+        # version="1.0.0", # Optional version
+        # No explicit capabilities dict needed with FastMCP decorators
     )
 
-    # ... Define Tools, Resources, Prompts here ...
+    # ... Define Tools, Resources, Prompts using @mcp decorators here ...
 
-    # Function to start the server (see "Running the Server" section)
+    # Example runner (adapt as needed, see "Running the Server")
     async def start():
         print("Starting server via stdio...", file=sys.stderr)
-        transport = StdioServerTransport()
-        await server.connect(transport)
-        print("Server connected.", file=sys.stderr)
-        # Keep running indefinitely (or until transport closes)
-        await asyncio.Event().wait()
+        # Transport setup might differ based on how client connects
+        # transport = StdioServerTransport()
+        # await mcp.run_async(transport=transport) # run_async is common with FastMCP
+        print("Server connected/running (or use mcp.run()).", file=sys.stderr)
+        # For simple cases, mcp.run() might block and handle transport
+        # await asyncio.Event().wait() # May not be needed if mcp.run() blocks
 
     if __name__ == "__main__":
-        import sys
         # Ensure event loop runs on Windows
         if sys.platform == "win32":
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         try:
-            asyncio.run(start())
+            # Decide how to run: asyncio.run(start()) or mcp.run() directly
+            # asyncio.run(start())
+            mcp.run() # Often simpler for stdio
         except KeyboardInterrupt:
             print("Server stopped.", file=sys.stderr)
     ```
@@ -212,3 +213,5 @@ Details of client implementation are outside the scope of this server guide.
 ## Next Steps
 
 Explore the `examples/` directory within this repository for fully runnable Python and TypeScript servers demonstrating these concepts. Each example includes its own README with specific setup and usage instructions.
+
+{{ ... }}
