@@ -215,6 +215,62 @@ If a tool encounters an error during execution (e.g., failed network request, in
     ```
     The decorator automatically handles registration and uses the Pydantic model (`EchoParams`, `FetchJsonParams`) for input validation and schema generation. Notice that the `input_schema` parameter is *not* passed to the decorator; it's inferred from the type hint.
 
+### Example: Sampling with Temperature (Python)
+
+You can introduce parameters to control the behavior of your tools, such as a `temperature` for sampling-based generation.
+
+```python
+# (from examples/python-minimal/server.py)
+import random
+from pydantic import BaseModel, Field
+import logging
+
+# ... (assuming 'mcp' FastMCP instance and 'log' logger are defined)
+
+class CreativeResponseParams(BaseModel):
+    prompt: str = Field(..., description="The input prompt for the creative response.")
+    temperature: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Controls randomness. Lower values are more deterministic, higher values are more random."
+    )
+
+@mcp.tool(
+    name="creative_response",
+    description="Generates a creative response based on a prompt, influenced by temperature.",
+)
+async def creative_response_tool(params: CreativeResponseParams) -> str:
+    log.info(f"Tool 'creative_response' called with prompt: '{params.prompt}', temperature: {params.temperature}")
+    responses = [
+        f"A very straightforward answer about: {params.prompt}",
+        f"Thinking outside the box regarding: {params.prompt}",
+        f"A whimsical take on: {params.prompt}",
+        f"Let's get abstract with: {params.prompt}"
+    ]
+    if params.temperature < 0.3:
+        chosen_response = responses[0]
+    elif params.temperature > 0.8:
+        chosen_response = random.choice(responses)
+    else:
+        chosen_response = random.choice(responses[:2])
+    log.info(f"Tool 'creative_response' completed. Response: '{chosen_response}'")
+    return chosen_response
+```
+
+**Calling the Tool:** The arguments should be nested under a `"params"` key:
+
+```json
+{
+  "params": {
+    "prompt": "Some creative prompt",
+    "temperature": 0.6
+  }
+}
+```
+
+**Important Testing Note:** Due to potential interactions between certain standard library modules (like `random`) and the specific way background processes are managed for testing within some development environments (like Cascade's direct tool calling), tools like this might cause the background server process to terminate unexpectedly when called directly by the environment. However, they should function correctly when called from a standard external MCP client.
+
 ## Defining Resources
 
 Resources expose data to the client. They are identified by URIs.

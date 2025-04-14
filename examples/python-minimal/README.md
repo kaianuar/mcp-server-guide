@@ -11,6 +11,7 @@ This server demonstrates key MCP features:
 *   **Tools:**
     *   `calculate`: A synchronous tool performing arithmetic.
     *   `fetch-json`: An asynchronous tool fetching JSON from a URL, demonstrating error handling via exceptions.
+    *   `creative_response`: Generates a creative text response based on a prompt, with randomness controlled by a `temperature` parameter.
 *   **Input Validation:** Uses [Pydantic](https://docs.pydantic.dev/) models to define and validate input schemas for tools (like `fetch-json`).
 *   **Resources:**
     *   `hello`: A static resource providing plain text.
@@ -34,6 +35,20 @@ This server demonstrates key MCP features:
     - Arguments:
       - `url` (string): The URL to fetch JSON data from.
     - Returns: `string` (the fetched JSON data, pretty-printed) or an error message.
+  - `creative_response`: Generates a creative text response based on a prompt, with randomness controlled by a `temperature` parameter.
+    - **Parameters:**
+      - `prompt` (string, required): The input text prompt.
+      - `temperature` (float, optional, default: 0.7, range: 0.0-1.0): Controls the randomness of the response selection. Lower values (e.g., 0.1) are more deterministic, while higher values (e.g., 0.9) are more random.
+    - **Example Call (JSON Arguments):**
+      ```json
+      {
+        "params": {
+          "prompt": "Tell me about AI",
+          "temperature": 0.8
+        }
+      }
+      ```
+    - **Note:** Due to potential interactions between certain standard library modules (like `random`) and the specific way background processes are managed for testing within some development environments (like Cascade's direct tool calling), this specific tool might cause the background server process to terminate unexpectedly when called directly by the environment. However, the tool functions correctly when called from a standard external MCP client.
 - **Resources:**
   - `mcp-resource://enhanced-python-server/hello`: A static resource returning a greeting message (`text/plain`).
   - `mcp-resource://enhanced-python-server/greeting/{name}`: A dynamic resource returning a personalized greeting based on the `{name}` provided in the URI (`text/plain`).

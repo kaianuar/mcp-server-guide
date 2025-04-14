@@ -9,6 +9,7 @@ import aiohttp
 import json
 from pydantic import BaseModel, Field, HttpUrl
 import sys
+import random
 
 # Configure basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', stream=sys.stderr)
@@ -129,6 +130,50 @@ async def fetch_json(params: FetchJsonParams) -> str:
         log.exception(f"Unexpected error fetching URL {url_str}: {e}") # Use log.exception
         # Re-raise the unexpected error
         raise
+
+# --- Sampling Example Tool --- #
+
+class CreativeResponseParams(BaseModel):
+    prompt: str = Field(..., description="The input prompt for the creative response.")
+    temperature: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Controls randomness. Lower values are more deterministic, higher values are more random."
+    )
+
+@mcp.tool(
+    name="creative_response",
+    description="Generates a creative response based on a prompt, influenced by temperature.",
+)
+async def creative_response_tool(params: CreativeResponseParams) -> str:
+    """Generates a creative text response, varying based on temperature."""
+    log.info(f"Tool 'creative_response' called with prompt: '{params.prompt}', temperature: {params.temperature}")
+ 
+    # Predefined responses
+    responses = [
+        f"A very straightforward answer about: {params.prompt}",
+        f"Thinking outside the box regarding: {params.prompt}",
+        f"A whimsical take on: {params.prompt}",
+        f"Let's get abstract with: {params.prompt}"
+    ]
+ 
+    # Simple logic based on temperature
+    if params.temperature < 0.3:
+        # Low temperature -> more deterministic
+        chosen_response = responses[0]
+        log.debug("Low temperature, choosing deterministic response.")
+    elif params.temperature > 0.8:
+        # High temperature -> more random (choose from all)
+        chosen_response = random.choice(responses)
+        log.debug("High temperature, choosing random response from all options.")
+    else:
+        # Medium temperature -> slightly less deterministic (choose from first two)
+        chosen_response = random.choice(responses[:2])
+        log.debug("Medium temperature, choosing random response from first two options.")
+ 
+    log.info(f"Tool 'creative_response' completed. Response: '{chosen_response}'")
+    return chosen_response
 
 # --- Resources --- #
 
