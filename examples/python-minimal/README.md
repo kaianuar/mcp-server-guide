@@ -12,6 +12,8 @@ This server demonstrates key MCP features:
     *   `calculate`: A synchronous tool performing arithmetic.
     *   `fetch-json`: An asynchronous tool fetching JSON from a URL, demonstrating error handling via exceptions.
     *   `creative_response`: Generates a creative text response based on a prompt, with randomness controlled by a `temperature` parameter.
+    *   `read_file`: Asynchronously reads content from a file within a safe `sandbox` directory.
+    *   `write_file`: Asynchronously writes content to a file within a safe `sandbox` directory.
 *   **Input Validation:** Uses [Pydantic](https://docs.pydantic.dev/) models to define and validate input schemas for tools (like `fetch-json`).
 *   **Resources:**
     *   `hello`: A static resource providing plain text.
@@ -49,6 +51,32 @@ This server demonstrates key MCP features:
       }
       ```
     - **Note:** Due to potential interactions between certain standard library modules (like `random`) and the specific way background processes are managed for testing within some development environments (like Cascade's direct tool calling), this specific tool might cause the background server process to terminate unexpectedly when called directly by the environment. However, the tool functions correctly when called from a standard external MCP client.
+  - `read_file`: Reads the text content of a specified file. **Note:** For security, this tool can only access files within the `examples/python-minimal/sandbox/` directory.
+    - **Parameters:**
+      - `filename` (string, required): The name of the file to read (relative to the sandbox directory).
+    - **Returns:** `string` (the file content) or an error message.
+    - **Example Call (JSON Arguments):**
+      ```json
+      {
+        "params": {
+          "filename": "my_data.txt"
+        }
+      }
+      ```
+  - `write_file`: Writes text content to a specified file. **Note:** For security, this tool can only write files within the `examples/python-minimal/sandbox/` directory. It will create the file if it doesn't exist, or overwrite it if it does.
+    - **Parameters:**
+      - `filename` (string, required): The name of the file to write (relative to the sandbox directory).
+      - `content` (string, required): The text content to write.
+    - **Returns:** `string` (a success message) or an error message.
+    - **Example Call (JSON Arguments):**
+      ```json
+      {
+        "params": {
+          "filename": "output.log",
+          "content": "Log entry: Process completed."
+        }
+      }
+      ```
 - **Resources:**
   - `mcp-resource://enhanced-python-server/hello`: A static resource returning a greeting message (`text/plain`).
   - `mcp-resource://enhanced-python-server/greeting/{name}`: A dynamic resource returning a personalized greeting based on the `{name}` provided in the URI (`text/plain`).
@@ -157,7 +185,25 @@ This will show the available tools, resources, and prompts.
 > prompt summarize-text --text_to_summarize "Python is an interpreted, high-level, general-purpose programming language. Created by Guido van Rossum and first released in 1991, Python's design philosophy emphasizes code readability with its notable use of significant whitespace."
 ```
 
-**7. Disconnect:**
+**7. Use the `creative_response` tool:**
+
+```
+> tool creative_response --prompt "Tell me about async file io" --temperature 0.6
+```
+
+**8. Use the `write_file` tool (creates sandbox/hello.txt):**
+
+```
+> tool write_file --filename "hello.txt" --content "Hello from the write_file tool!"
+```
+
+**9. Use the `read_file` tool (reads sandbox/hello.txt):**
+
+```
+> tool read_file --filename "hello.txt"
+```
+
+**10. Disconnect:**
 
 ```
 > disconnect

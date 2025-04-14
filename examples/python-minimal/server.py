@@ -10,6 +10,8 @@ import json
 from pydantic import BaseModel, Field, HttpUrl
 import sys
 import random
+import aiofiles
+from pathlib import Path
 
 # Configure basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', stream=sys.stderr)
@@ -174,6 +176,79 @@ async def creative_response_tool(params: CreativeResponseParams) -> str:
  
     log.info(f"Tool 'creative_response' completed. Response: '{chosen_response}'")
     return chosen_response
+
+# --- File I/O Tools --- #
+
+# Define a safe base directory for file operations
+SANDBOX_DIR = Path(__file__).parent / "sandbox"
+SANDBOX_DIR.mkdir(exist_ok=True) # Create sandbox if it doesn't exist
+
+def _resolve_sandbox_path(filename: str) -> Path:
+    """Resolves a filename to an absolute path within the sandbox, preventing escape."""
+    # Normalize the filename to prevent directory traversal
+    # os.path.normpath might be another option, but Path resolves '..' safely.
+    # Security: Ensure the resolved path is still inside the sandbox
+    resolved_path = SANDBOX_DIR.joinpath(filename).resolve()
+    if SANDBOX_DIR not in resolved_path.parents and resolved_path != SANDBOX_DIR:
+         # This check prevents resolving paths like ../../etc/passwd
+         raise ValueError(f"Path '{filename}' attempts to escape the sandbox directory.")
+    return resolved_path
+
+class ReadFileParams(BaseModel):
+    filename: str = Field(..., description="The name of the file to read within the sandbox.")
+
+@mcp.tool(
+    name="read_file",
+    description="Reads the content of a specified file within the server's sandbox directory.",
+)
+async def read_file_tool(params: ReadFileParams) -> str:
+    try:
+        target_path = _resolve_sandbox_path(params.filename)
+        log.info(f"Attempting to read file: {target_path}")
+        if not target_path.is_file():
+            log.warning(f"File not found or is not a file: {target_path}")
+            return f"Error: File not found or is not a regular file: {params.filename}"
+
+        async with aiofiles.open(target_path, mode='r', encoding='utf-8') as f:
+            content = await f.read()
+        log.info(f"Successfully read file: {target_path}")
+        return content
+    except ValueError as e:
+        log.error(f"Path validation error for '{params.filename}': {e}")
+        return f"Error: Invalid filename. {e}"
+    except Exception as e:
+        log.exception(f"Error reading file '{params.filename}': {e}")
+        return f"Error: Could not read file '{params.filename}'. {e}"
+
+class WriteFileParams(BaseModel):
+    filename: str = Field(..., description="The name of the file to write within the sandbox.")
+    content: str = Field(..., description="The text content to write to the file.")
+
+@mcp.tool(
+    name="write_file",
+    description="Writes text content to a specified file within the server's sandbox directory.",
+)
+async def write_file_tool(params: WriteFileParams) -> str:
+    try:
+        target_path = _resolve_sandbox_path(params.filename)
+        log.info(f"Attempting to write to file: {target_path}")
+
+        # Security: Ensure we don't overwrite directories
+        if target_path.is_dir():
+             log.warning(f"Attempted to write to a directory: {target_path}")
+             return f"Error: Cannot write to '{params.filename}' as it is a directory."
+
+        async with aiofiles.open(target_path, mode='w', encoding='utf-8') as f:
+            await f.write(params.content)
+
+        log.info(f"Successfully wrote to file: {target_path}")
+        return f"Successfully wrote content to '{params.filename}'."
+    except ValueError as e:
+        log.error(f"Path validation error for '{params.filename}': {e}")
+        return f"Error: Invalid filename. {e}"
+    except Exception as e:
+        log.exception(f"Error writing file '{params.filename}': {e}")
+        return f"Error: Could not write to file '{params.filename}'. {e}"
 
 # --- Resources --- #
 
